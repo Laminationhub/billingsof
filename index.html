@@ -23,7 +23,7 @@
         .sidebar { width: 260px; background: var(--dark); color: white; display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 4px 0 10px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 30px 20px; background: rgba(0,0,0,0.1); text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
         
-        /* NEW SYNC INDICATOR STYLE */
+        /* SYNC INDICATOR STYLE */
         #cloud-sync-status { padding: 10px; font-size: 11px; text-align: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.05); }
 
         .profile-pic-container { width: 80px; height: 80px; margin: 0 auto 15px; border-radius: 50%; border: 3px solid var(--primary); overflow: hidden; background: #eee; }
@@ -197,7 +197,13 @@
             </div>
 
             <div id="inventory-view" class="view-section">
-                <div class="header"><h1>Inventory Management</h1><button class="btn btn-green" onclick="openProductModal()">+ Add Product</button></div>
+                <div class="header">
+                    <h1>Inventory Management</h1>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn btn-blue" onclick="openBulkModal()">🔄 Bulk Update</button>
+                        <button class="btn btn-green" onclick="openProductModal()">+ Add Product</button>
+                    </div>
+                </div>
                 <div class="container" style="padding:0;"><div class="table-wrap"><table><thead><tr><th>Item Name</th><th>Sale Price</th><th>Stock Count</th><th>Action</th></tr></thead><tbody id="inventoryTableBody"></tbody></table></div></div>
             </div>
 
@@ -222,6 +228,18 @@
     <div id="productModal" class="modal-bg"><div class="modal-box"><h3>Product Info</h3><div class="form-group"><label>Name</label><input type="text" id="pName"></div><div class="form-group"><label>Price (₹)</label><input type="number" id="pPrice"></div><div class="form-group"><label>Stock</label><input type="number" id="pStock"></div><button class="btn btn-blue" style="width:100%" onclick="saveProduct()">Save Product</button><br><br><button class="btn btn-gray" style="width:100%" onclick="closeModals()">Cancel</button></div></div>
     <div id="expenseModal" class="modal-bg"><div class="modal-box"><h3>Log Expense</h3><div class="form-group"><label>Description</label><input type="text" id="eDesc"></div><div class="form-group"><label>Amount (₹)</label><input type="number" id="eAmt"></div><button class="btn btn-danger" style="width:100%" onclick="saveExpense()">Save Expense</button><br><br><button class="btn btn-gray" style="width:100%" onclick="closeModals()">Cancel</button></div></div>
     <div id="viewBillModal" class="modal-bg"><div class="modal-box" id="billDetailContent"></div></div>
+    
+    <div id="bulkModal" class="modal-bg">
+        <div class="modal-box" style="width: 500px;">
+            <h3>Bulk Stock Update</h3>
+            <p style="font-size: 0.8em; color: #666;">Enter the quantity to ADD to current stock (e.g., +10).</p>
+            <div id="bulkItemsContainer" style="max-height: 300px; overflow-y: auto; margin: 15px 0; border: 1px solid #eee; border-radius: 8px;">
+                </div>
+            <button class="btn btn-blue" style="width:100%" onclick="saveBulkStock()">Update All & Sync</button><br><br>
+            <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Cancel</button>
+        </div>
+    </div>
+
     <div id="receipt-print-area"></div>
 
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
@@ -256,6 +274,7 @@
         let cart = [];
         let custTrigger = "list";
         let tempBase64Img = "";
+        let editingProductId = null; // NEW VARIABLE FOR EDITING
 
         // GMAIL LOGIN LOGIC
         async function handleGoogleLogin() {
@@ -265,7 +284,6 @@
             try {
                 const result = await auth.signInWithPopup(provider);
                 console.log("Logged in as:", result.user.email);
-                // After successful login, sync and enter
                 await syncAndEnterApp();
             } catch (error) {
                 console.error("Gmail Error:", error);
@@ -309,7 +327,7 @@
             }
         }
 
-        // UPDATED CLOUD SYNC LOGIC
+        // CLOUD SYNC LOGIC
         async function saveToStorage() {
             const syncText = document.getElementById('sync-text');
             if(syncText) {
@@ -317,7 +335,6 @@
                 syncText.style.color = "#ffc107";
             }
 
-            // Local
             localStorage.setItem('l_pass', appPass);
             localStorage.setItem('l_settings', JSON.stringify(settings));
             localStorage.setItem('l_inv', JSON.stringify(inventory));
@@ -325,7 +342,6 @@
             localStorage.setItem('l_exp', JSON.stringify(expenses));
             localStorage.setItem('l_cust', JSON.stringify(customers));
             
-            // Cloud
             try { 
                 await docRef.set({ appPass, settings, inventory, sales, expenses, customers }); 
                 if(syncText) {
@@ -411,7 +427,18 @@
                 if(i.name.toLowerCase().includes(q)) pGrid.innerHTML += `<div class="product-card" onclick='addToCart(${JSON.stringify(i)})'><h4>${i.name}</h4><p>₹${i.price}</p></div>`;
             });
 
-            document.getElementById('inventoryTableBody').innerHTML = inventory.map(i => `<tr class="${i.stock <= 5 ? 'low-stock' : ''}"><td>${i.name}</td><td>₹${i.price}</td><td><b>${i.stock}</b></td><td><button class="btn btn-gray" style="color:red;" onclick="deleteItem('inv', ${i.id})">Del</button></td></tr>`).join('');
+            // UPDATED INVENTORY ROW (Includes Edit Button)
+            document.getElementById('inventoryTableBody').innerHTML = inventory.map(i => `
+                <tr class="${i.stock <= 5 ? 'low-stock' : ''}">
+                    <td>${i.name}</td>
+                    <td>₹${i.price}</td>
+                    <td><b>${i.stock}</b></td>
+                    <td>
+                        <button class="btn btn-gray" style="color:var(--primary); margin-right:5px;" onclick="editProduct(${i.id})">Edit</button>
+                        <button class="btn btn-gray" style="color:red;" onclick="deleteItem('inv', ${i.id})">Del</button>
+                    </td>
+                </tr>`).join('');
+                
             document.getElementById('expenseTableBody').innerHTML = expenses.slice().reverse().map(e => `<tr><td>${e.date}</td><td>${e.desc}</td><td>₹${e.amt}</td><td><button class="btn btn-gray" style="color:red;" onclick="deleteItem('exp', ${e.id})">Del</button></td></tr>`).join('');
             document.getElementById('customerTableBody').innerHTML = customers.map(c => `<tr><td><b>${c.name}</b></td><td>${c.phone}</td><td>₹${c.spent}</td><td>${c.id !== 1 ? `<button class="btn btn-gray" style="color:red;" onclick="deleteItem('cust', ${c.id})">Del</button>` : ''}</td></tr>`).join('');
             document.getElementById('historyTableBody').innerHTML = sales.slice().reverse().map(s => `<tr><td>#${s.id}</td><td>${s.date}</td><td>${s.cust}</td><td>₹${s.total}</td><td><button class="btn btn-blue" onclick="viewPastBill('${s.id}')">👁️</button> <button class="btn btn-danger" onclick="deleteSale('${s.id}')">🗑️</button></td></tr>`).join('');
@@ -419,6 +446,74 @@
             filterCustomerDropdown();
             saveToStorage();
         }
+
+        // --- NEW/UPDATED INVENTORY LOGIC ---
+
+        function editProduct(id) {
+            const p = inventory.find(x => x.id === id);
+            if (!p) return;
+            editingProductId = id;
+            document.getElementById('pName').value = p.name;
+            document.getElementById('pPrice').value = p.price;
+            document.getElementById('pStock').value = p.stock;
+            document.querySelector('#productModal h3').innerText = "Edit Product";
+            openProductModal();
+        }
+
+        function saveProduct() { 
+            const name = document.getElementById('pName').value;
+            const price = parseFloat(document.getElementById('pPrice').value);
+            const stock = parseInt(document.getElementById('pStock').value);
+
+            if (editingProductId) {
+                const p = inventory.find(x => x.id === editingProductId);
+                if (p) { p.name = name; p.price = price; p.stock = stock; }
+            } else {
+                inventory.push({id:Date.now(), name, price, stock});
+            }
+            closeModals(); 
+            refreshDisplays(); 
+        }
+
+        function openBulkModal() {
+            const container = document.getElementById('bulkItemsContainer');
+            container.innerHTML = inventory.map(i => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f8fafc;">
+                    <span style="font-size: 0.9em; flex: 1;">${i.name} <br><small style="color:#999;">Current Stock: ${i.stock}</small></span>
+                    <input type="number" class="bulk-qty-input" data-id="${i.id}" placeholder="+0" style="width: 80px; padding: 5px; border: 1px solid #ccc; border-radius: 4px;">
+                </div>
+            `).join('');
+            document.getElementById('bulkModal').style.display = 'flex';
+        }
+
+        function saveBulkStock() {
+            const inputs = document.querySelectorAll('.bulk-qty-input');
+            let changed = false;
+            inputs.forEach(input => {
+                const addQty = parseInt(input.value);
+                if (!isNaN(addQty) && addQty !== 0) {
+                    const product = inventory.find(p => p.id == input.getAttribute('data-id'));
+                    if (product) { product.stock += addQty; changed = true; }
+                }
+            });
+            if (changed) { 
+                alert("Stock updated successfully!"); 
+                refreshDisplays(); 
+            }
+            closeModals();
+        }
+
+        function closeModals() { 
+            editingProductId = null;
+            let pTitle = document.querySelector('#productModal h3');
+            if (pTitle) pTitle.innerText = "Product Info";
+            document.querySelectorAll('.modal-bg').forEach(m => m.style.display='none'); 
+            document.getElementById('pName').value = '';
+            document.getElementById('pPrice').value = '';
+            document.getElementById('pStock').value = '';
+        }
+
+        // --- REST OF ORIGINAL LOGIC ---
 
         function saveShopSettings() {
             settings.name = document.getElementById('set-name').value;
@@ -465,10 +560,8 @@
         function openCustomerModal(s) { custTrigger = s; document.getElementById('customerModal').style.display = 'flex'; }
         function saveCustomer() { let id = Date.now(); customers.push({ id, name: document.getElementById('cName').value, phone: document.getElementById('cPhone').value, spent: 0 }); if(custTrigger === 'pos') refreshDisplays(), document.getElementById('posCustomerSelect').value = id; else refreshDisplays(); closeModals(); }
         function openProductModal() { document.getElementById('productModal').style.display='flex'; }
-        function saveProduct() { inventory.push({id:Date.now(), name:document.getElementById('pName').value, price:parseFloat(document.getElementById('pPrice').value), stock:parseInt(document.getElementById('pStock').value)}); closeModals(); refreshDisplays(); }
         function openExpenseModal() { document.getElementById('expenseModal').style.display='flex'; }
         function saveExpense() { expenses.push({id:Date.now(), date:new Date().toLocaleDateString(), desc:document.getElementById('eDesc').value, amt:parseFloat(document.getElementById('eAmt').value)}); closeModals(); refreshDisplays(); }
-        function closeModals() { document.querySelectorAll('.modal-bg').forEach(m => m.style.display='none'); }
         function deleteItem(t, id) { if(confirm("Confirm?")) { if(t==='inv') inventory = inventory.filter(i=>i.id!==id); if(t==='exp') expenses = expenses.filter(i=>i.id!==id); if(t==='cust') customers = customers.filter(c=>c.id!==id); refreshDisplays(); } }
         function filterCustomerDropdown() { const q = document.getElementById('custSearchInput').value.toLowerCase(); document.getElementById('posCustomerSelect').innerHTML = customers.filter(c => c.name.toLowerCase().includes(q) || c.phone.includes(q)).map(c => `<option value="${c.id}">${c.name}</option>`).join(''); }
         function exportData() { const b = new Blob([JSON.stringify({pass:appPass, settings, inventory, sales, expenses, customers})], {type:'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download=`Backup.json`; a.click(); }
