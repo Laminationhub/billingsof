@@ -22,6 +22,10 @@
         #main-app { display: none; height: 100vh; width: 100%; flex-direction: row; }
         .sidebar { width: 260px; background: var(--dark); color: white; display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 4px 0 10px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 30px 20px; background: rgba(0,0,0,0.1); text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        
+        /* NEW SYNC INDICATOR STYLE */
+        #cloud-sync-status { padding: 10px; font-size: 11px; text-align: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.05); }
+
         .profile-pic-container { width: 80px; height: 80px; margin: 0 auto 15px; border-radius: 50%; border: 3px solid var(--primary); overflow: hidden; background: #eee; }
         #sidebar-img { width: 100%; height: 100%; object-fit: cover; }
         .sidebar-header h2 { margin: 0; color: white; font-size: 1.4em; letter-spacing: 1px; }
@@ -100,6 +104,11 @@
                 <h2 id="brand-name">Lamination Hub</h2>
                 <p id="brand-city" style="font-size: 0.8em; opacity: 0.7; margin-top: 5px;">Kurebhar Branch</p>
             </div>
+            
+            <div id="cloud-sync-status">
+                Cloud Status: <span id="sync-text" style="color: #ffc107; font-weight: bold;">Connecting...</span>
+            </div>
+
             <ul class="nav-links">
                 <li id="nav-dashboard" class="active" onclick="switchTab('dashboard')">📊 Dashboard</li>
                 <li id="nav-pos" onclick="switchTab('pos')">🧾 New Bill</li>
@@ -155,6 +164,13 @@
 
             <div id="settings-view" class="view-section">
                 <div class="header"><h1>Settings</h1></div>
+                
+                <div class="container">
+                    <h3>🔄 Cloud Sync</h3>
+                    <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">Manually pull the latest data from the cloud if other devices have made changes.</p>
+                    <button class="btn btn-blue" onclick="forceCloudRefresh()">Force Cloud Refresh</button>
+                </div>
+
                 <div class="container">
                     <h3>🏢 Business Profile</h3>
                     <div class="form-group"><label>Profile Picture</label><input type="file" id="set-profile-pic" accept="image/*"></div>
@@ -293,7 +309,14 @@
             }
         }
 
+        // UPDATED CLOUD SYNC LOGIC
         async function saveToStorage() {
+            const syncText = document.getElementById('sync-text');
+            if(syncText) {
+                syncText.innerText = "Saving...";
+                syncText.style.color = "#ffc107";
+            }
+
             // Local
             localStorage.setItem('l_pass', appPass);
             localStorage.setItem('l_settings', JSON.stringify(settings));
@@ -303,7 +326,43 @@
             localStorage.setItem('l_cust', JSON.stringify(customers));
             
             // Cloud
-            try { await docRef.set({ appPass, settings, inventory, sales, expenses, customers }); } catch(e){}
+            try { 
+                await docRef.set({ appPass, settings, inventory, sales, expenses, customers }); 
+                if(syncText) {
+                    syncText.innerText = "Synced";
+                    syncText.style.color = "#28a745";
+                }
+            } catch(e) {
+                console.error("Cloud push failed.");
+                if(syncText) {
+                    syncText.innerText = "Offline (Local Only)";
+                    syncText.style.color = "#dc3545";
+                }
+            }
+        }
+
+        // FORCE CLOUD REFRESH
+        async function forceCloudRefresh() {
+            if(!confirm("Pull latest data from cloud? This will overwrite unsaved local changes.")) return;
+            try {
+                const doc = await docRef.get();
+                if (doc.exists()) {
+                    const d = doc.data();
+                    appPass = d.appPass || appPass;
+                    settings = d.settings || settings;
+                    inventory = d.inventory || inventory;
+                    sales = d.sales || sales;
+                    expenses = d.expenses || expenses;
+                    customers = d.customers || customers;
+                    alert("Data refreshed from cloud!");
+                    initApp();
+                } else {
+                    alert("No cloud data found.");
+                }
+            } catch (e) { 
+                alert("Refresh failed. Check internet.");
+                console.error(e); 
+            }
         }
 
         // IMAGE HANDLER
