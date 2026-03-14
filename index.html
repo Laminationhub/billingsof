@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lamination Hub - Pro Suite</title>
     <style>
+        /* ALL YOUR ORIGINAL STYLES REMAIN UNCHANGED */
         :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --dark: #2c3e50; --light: #f4f7f6; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; background-color: var(--light); height: 100vh; overflow: hidden; color: #333; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--dark); display: flex; justify-content: center; align-items: center; z-index: 9999; }
@@ -13,6 +14,7 @@
         .login-box input { width: 100%; padding: 12px; margin: 20px 0; border: 2px solid #eee; border-radius: 8px; font-size: 1.1em; text-align: center; outline: none; transition: 0.3s; }
         .login-box input:focus { border-color: var(--primary); }
         
+        /* GMAIL BUTTON STYLE */
         .btn-google { background: white; color: #444; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-bottom: 15px; padding: 12px; cursor: pointer; border-radius: 8px; font-weight: 600; transition: 0.2s; }
         .btn-google:hover { background: #f8f9fa; }
         .btn-google img { width: 18px; }
@@ -21,6 +23,7 @@
         .sidebar { width: 260px; background: var(--dark); color: white; display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 4px 0 10px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 30px 20px; background: rgba(0,0,0,0.1); text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
         
+        /* SYNC INDICATOR STYLE */
         #cloud-sync-status { padding: 10px; font-size: 11px; text-align: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.05); }
 
         .profile-pic-container { width: 80px; height: 80px; margin: 0 auto 15px; border-radius: 50%; border: 3px solid var(--primary); overflow: hidden; background: #eee; }
@@ -149,8 +152,14 @@
                                 <button class="btn btn-green" onclick="openCustomerModal('pos')">+</button>
                             </div>
                         </div>
-                        <table style="margin-bottom: 20px;"><tbody id="cartBody"></tbody></table>
-                        <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 2px solid #eee; padding-top: 15px;">
+                        <table style="margin-bottom: 10px;"><tbody id="cartBody"></tbody></table>
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #eee;">
+                            <span style="font-weight: bold; color: #64748b; font-size: 0.9em;">DISCOUNT (₹)</span>
+                            <input type="number" id="posDiscount" placeholder="0" style="width: 100px; padding: 8px; text-align: right; border: 1px solid #cbd5e1; border-radius: 5px;" oninput="updateCart()" min="0">
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
                             <span>Total Payable:</span>
                             <span style="font-size: 2em; font-weight: 800; color: var(--primary);" id="grandTotal">₹0</span>
                         </div>
@@ -260,7 +269,7 @@
         const provider = new firebase.auth.GoogleAuthProvider();
         const docRef = db.collection("shops").doc("kurebhar_main");
 
-        // MEMORY SETUP (With crash protection)
+        // MEMORY SETUP
         let appPass = '1234';
         let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '' };
         let inventory = []; let sales = []; let expenses = []; let customers = [{id:1, name:'Walk-in', phone:'--', spent:0}];
@@ -274,7 +283,7 @@
         
         let cart = []; let custTrigger = "list"; let tempBase64Img = ""; let editingProductId = null;
 
-        // NEW: AUTO LOGIN IF GOOGLE REMEMBERS YOU
+        // AUTO LOGIN
         auth.onAuthStateChanged(user => {
             if (user) {
                 console.log("Auto-logged in as:", user.email);
@@ -297,7 +306,6 @@
         async function syncAndEnterApp() {
             try {
                 const doc = await docRef.get();
-                // FIX: Removed () from doc.exists
                 if (doc.exists) {
                     const d = doc.data();
                     appPass = d.appPass || appPass;
@@ -350,7 +358,6 @@
             if(!confirm("Pull latest data from cloud? This will overwrite unsaved local changes.")) return;
             try {
                 const doc = await docRef.get();
-                // FIX: Removed () from doc.exists
                 if (doc.exists) {
                     const d = doc.data();
                     appPass = d.appPass || appPass;
@@ -484,26 +491,62 @@
             saveToStorage(); alert("Synced!"); initApp();
         }
 
+        // --- UPDATED DISCOUNT & CART LOGIC ---
+
         function addToCart(p) { let ex = cart.find(c => c.id === p.id); if (ex) ex.qty++; else cart.push({ ...p, qty: 1 }); updateCart(); }
+        
         function updateCart() {
-            let total = 0;
-            document.getElementById('cartBody').innerHTML = cart.map(i => { total += i.price*i.qty; return `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`; }).join('');
-            document.getElementById('grandTotal').innerText = "₹" + total;
+            let subtotal = 0;
+            document.getElementById('cartBody').innerHTML = cart.map(i => { subtotal += i.price*i.qty; return `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`; }).join('');
+            
+            // Calculate Discount
+            let discount = parseFloat(document.getElementById('posDiscount').value) || 0;
+            let grandTotal = subtotal - discount;
+            if(grandTotal < 0) grandTotal = 0; // Prevent negative totals
+
+            document.getElementById('grandTotal').innerText = "₹" + grandTotal;
         }
 
         function completeSale() {
-            let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', '')); if (total <= 0) return;
-            let cid = document.getElementById('posCustomerSelect').value; let c = customers.find(x => x.id == cid);
-            const newSale = { id: Date.now().toString().slice(-6), date: new Date().toLocaleString(), cust: c.name, total, items: JSON.parse(JSON.stringify(cart)) };
-            sales.push(newSale); if(c) c.spent += total;
+            let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', '')); 
+            if (cart.length === 0) return; // Prevent empty checkout
+            
+            let discount = parseFloat(document.getElementById('posDiscount').value) || 0;
+            let cid = document.getElementById('posCustomerSelect').value; 
+            let c = customers.find(x => x.id == cid);
+            
+            const newSale = { 
+                id: Date.now().toString().slice(-6), 
+                date: new Date().toLocaleString(), 
+                cust: c.name, 
+                total: total, 
+                discount: discount, 
+                items: JSON.parse(JSON.stringify(cart)) 
+            };
+            
+            sales.push(newSale); 
+            if(c) c.spent += total;
+            
             cart.forEach(ci => { let invI = inventory.find(x => x.id == ci.id); if (invI) invI.stock -= ci.qty; });
-            generateReceiptHTML(newSale); window.print(); cart = []; updateCart(); refreshDisplays();
+            
+            generateReceiptHTML(newSale); 
+            window.print(); 
+            
+            cart = []; 
+            document.getElementById('posDiscount').value = ''; // Reset Discount Input
+            updateCart(); 
+            refreshDisplays();
         }
 
-        function generateReceiptHTML(s) { document.getElementById('receipt-print-area').innerHTML = `<center><h2>${settings.name}</h2><p>${settings.address}<br>${settings.city}<br>GST: ${settings.gst}<br>PH: ${settings.phone}</p><hr></center><p>INV #${s.id} | ${s.date}</p><p>Customer: ${s.cust}</p><table style="width:100%; border-top:1px dashed #000;">${s.items.map(i => `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><h2 align="right" style="border-top:1px solid #000;">Total: ₹${s.total}</h2><center><p>*** Thank You! ***</p></center>`; }
+        function generateReceiptHTML(s) { 
+            let discountHtml = (s.discount && s.discount > 0) ? `<h4 align="right" style="margin:5px 0;">Discount: -₹${s.discount}</h4>` : '';
+            document.getElementById('receipt-print-area').innerHTML = `<center><h2>${settings.name}</h2><p>${settings.address}<br>${settings.city}<br>GST: ${settings.gst}<br>PH: ${settings.phone}</p><hr></center><p>INV #${s.id} | ${s.date}</p><p>Customer: ${s.cust}</p><table style="width:100%; border-top:1px dashed #000;">${s.items.map(i => `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr style="border-top:1px dashed #000;">${discountHtml}<h2 align="right" style="border-top:1px solid #000; margin-top:5px; padding-top:5px;">Total: ₹${s.total}</h2><center><p>*** Thank You! ***</p></center>`; 
+        }
+        
         function viewPastBill(id) {
             const s = sales.find(x => x.id === id);
-            document.getElementById('billDetailContent').innerHTML = `<h3>Bill #${s.id}</h3><hr><table style="width:100%">${s.items.map(i => `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr><h2 align="right">Total: ₹${s.total}</h2><br><button class="btn btn-blue" style="width:100%" onclick="printExistingBill('${s.id}')">Re-Print</button><br><br><button class="btn btn-gray" style="width:100%" onclick="closeModals()">Close</button>`;
+            let discountHtml = (s.discount && s.discount > 0) ? `<h4 align="right" style="margin:5px 0; color: #dc3545;">Discount: -₹${s.discount}</h4>` : '';
+            document.getElementById('billDetailContent').innerHTML = `<h3>Bill #${s.id}</h3><hr><table style="width:100%">${s.items.map(i => `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr>${discountHtml}<h2 align="right">Total: ₹${s.total}</h2><br><button class="btn btn-blue" style="width:100%" onclick="printExistingBill('${s.id}')">Re-Print</button><br><br><button class="btn btn-gray" style="width:100%" onclick="closeModals()">Close</button>`;
             document.getElementById('viewBillModal').style.display = 'flex';
         }
         
