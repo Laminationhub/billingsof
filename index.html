@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lamination Hub - Pro Suite</title>
     <style>
-        /* ALL YOUR ORIGINAL STYLES REMAIN UNCHANGED */
         :root { --primary: #007bff; --success: #28a745; --danger: #dc3545; --warning: #ffc107; --dark: #2c3e50; --light: #f4f7f6; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; margin: 0; background-color: var(--light); height: 100vh; overflow: hidden; color: #333; }
         #login-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--dark); display: flex; justify-content: center; align-items: center; z-index: 9999; }
@@ -14,7 +13,6 @@
         .login-box input { width: 100%; padding: 12px; margin: 20px 0; border: 2px solid #eee; border-radius: 8px; font-size: 1.1em; text-align: center; outline: none; transition: 0.3s; }
         .login-box input:focus { border-color: var(--primary); }
         
-        /* GMAIL BUTTON STYLE */
         .btn-google { background: white; color: #444; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; margin-bottom: 15px; padding: 12px; cursor: pointer; border-radius: 8px; font-weight: 600; transition: 0.2s; }
         .btn-google:hover { background: #f8f9fa; }
         .btn-google img { width: 18px; }
@@ -23,7 +21,6 @@
         .sidebar { width: 260px; background: var(--dark); color: white; display: flex; flex-direction: column; flex-shrink: 0; box-shadow: 4px 0 10px rgba(0,0,0,0.1); }
         .sidebar-header { padding: 30px 20px; background: rgba(0,0,0,0.1); text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
         
-        /* SYNC INDICATOR STYLE */
         #cloud-sync-status { padding: 10px; font-size: 11px; text-align: center; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.05); }
 
         .profile-pic-container { width: 80px; height: 80px; margin: 0 auto 15px; border-radius: 50%; border: 3px solid var(--primary); overflow: hidden; background: #eee; }
@@ -233,8 +230,7 @@
         <div class="modal-box" style="width: 500px;">
             <h3>Bulk Stock Update</h3>
             <p style="font-size: 0.8em; color: #666;">Enter the quantity to ADD to current stock (e.g., +10).</p>
-            <div id="bulkItemsContainer" style="max-height: 300px; overflow-y: auto; margin: 15px 0; border: 1px solid #eee; border-radius: 8px;">
-                </div>
+            <div id="bulkItemsContainer" style="max-height: 300px; overflow-y: auto; margin: 15px 0; border: 1px solid #eee; border-radius: 8px;"></div>
             <button class="btn btn-blue" style="width:100%" onclick="saveBulkStock()">Update All & Sync</button><br><br>
             <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Cancel</button>
         </div>
@@ -264,29 +260,35 @@
         const provider = new firebase.auth.GoogleAuthProvider();
         const docRef = db.collection("shops").doc("kurebhar_main");
 
-        // MEMORY SETUP
-        let appPass = localStorage.getItem('l_pass') || '1234';
-        let settings = JSON.parse(localStorage.getItem('l_settings')) || { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '' };
-        let inventory = JSON.parse(localStorage.getItem('l_inv')) || [];
-        let sales = JSON.parse(localStorage.getItem('l_sales')) || [];
-        let expenses = JSON.parse(localStorage.getItem('l_exp')) || [];
-        let customers = JSON.parse(localStorage.getItem('l_cust')) || [{id:1, name:'Walk-in', phone:'--', spent:0}];
-        let cart = [];
-        let custTrigger = "list";
-        let tempBase64Img = "";
-        let editingProductId = null; // NEW VARIABLE FOR EDITING
+        // MEMORY SETUP (With crash protection)
+        let appPass = '1234';
+        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '' };
+        let inventory = []; let sales = []; let expenses = []; let customers = [{id:1, name:'Walk-in', phone:'--', spent:0}];
+        
+        try { if(localStorage.getItem('l_pass')) appPass = localStorage.getItem('l_pass'); } catch(e){}
+        try { if(localStorage.getItem('l_settings')) settings = JSON.parse(localStorage.getItem('l_settings')) || settings; } catch(e){}
+        try { if(localStorage.getItem('l_inv')) inventory = JSON.parse(localStorage.getItem('l_inv')) || []; } catch(e){}
+        try { if(localStorage.getItem('l_sales')) sales = JSON.parse(localStorage.getItem('l_sales')) || []; } catch(e){}
+        try { if(localStorage.getItem('l_exp')) expenses = JSON.parse(localStorage.getItem('l_exp')) || []; } catch(e){}
+        try { if(localStorage.getItem('l_cust')) customers = JSON.parse(localStorage.getItem('l_cust')) || customers; } catch(e){}
+        
+        let cart = []; let custTrigger = "list"; let tempBase64Img = ""; let editingProductId = null;
 
-        // GMAIL LOGIN LOGIC
+        // NEW: AUTO LOGIN IF GOOGLE REMEMBERS YOU
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                console.log("Auto-logged in as:", user.email);
+                syncAndEnterApp();
+            }
+        });
+
+        // GMAIL LOGIN
         async function handleGoogleLogin() {
             const btn = document.getElementById('googleLoginBtn');
-            btn.innerText = "Connecting Google...";
-            
+            btn.innerText = "Connecting...";
             try {
-                const result = await auth.signInWithPopup(provider);
-                console.log("Logged in as:", result.user.email);
-                await syncAndEnterApp();
+                await auth.signInWithPopup(provider);
             } catch (error) {
-                console.error("Gmail Error:", error);
                 alert("Login Failed: " + error.message);
                 btn.innerHTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"> Sign in with Google`;
             }
@@ -295,7 +297,8 @@
         async function syncAndEnterApp() {
             try {
                 const doc = await docRef.get();
-                if (doc.exists()) {
+                // FIX: Removed () from doc.exists
+                if (doc.exists) {
                     const d = doc.data();
                     appPass = d.appPass || appPass;
                     settings = d.settings || settings;
@@ -304,36 +307,29 @@
                     expenses = d.expenses || expenses;
                     customers = d.customers || customers;
                 }
-            } catch (e) { console.warn("Cloud pull failed."); }
+            } catch (e) { console.warn("Cloud pull failed.", e); }
 
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('main-app').style.display = 'flex';
             initApp();
         }
 
-        // ORIGINAL LOGIN LOGIC
         async function handleLogin() {
             const passInput = document.getElementById('passInput').value;
             const btn = document.getElementById('loginBtn');
-            btn.innerText = "Syncing...";
-            btn.disabled = true;
+            btn.innerText = "Syncing..."; btn.disabled = true;
 
             if (passInput === appPass) {
                 await syncAndEnterApp();
             } else {
                 alert("Access Denied!");
-                btn.innerText = "Unlock System";
-                btn.disabled = false;
+                btn.innerText = "Unlock with Password"; btn.disabled = false;
             }
         }
 
-        // CLOUD SYNC LOGIC
         async function saveToStorage() {
             const syncText = document.getElementById('sync-text');
-            if(syncText) {
-                syncText.innerText = "Saving...";
-                syncText.style.color = "#ffc107";
-            }
+            if(syncText) { syncText.innerText = "Saving..."; syncText.style.color = "#ffc107"; }
 
             localStorage.setItem('l_pass', appPass);
             localStorage.setItem('l_settings', JSON.stringify(settings));
@@ -344,25 +340,18 @@
             
             try { 
                 await docRef.set({ appPass, settings, inventory, sales, expenses, customers }); 
-                if(syncText) {
-                    syncText.innerText = "Synced";
-                    syncText.style.color = "#28a745";
-                }
+                if(syncText) { syncText.innerText = "Synced"; syncText.style.color = "#28a745"; }
             } catch(e) {
-                console.error("Cloud push failed.");
-                if(syncText) {
-                    syncText.innerText = "Offline (Local Only)";
-                    syncText.style.color = "#dc3545";
-                }
+                if(syncText) { syncText.innerText = "Offline (Local Only)"; syncText.style.color = "#dc3545"; }
             }
         }
 
-        // FORCE CLOUD REFRESH
         async function forceCloudRefresh() {
             if(!confirm("Pull latest data from cloud? This will overwrite unsaved local changes.")) return;
             try {
                 const doc = await docRef.get();
-                if (doc.exists()) {
+                // FIX: Removed () from doc.exists
+                if (doc.exists) {
                     const d = doc.data();
                     appPass = d.appPass || appPass;
                     settings = d.settings || settings;
@@ -381,11 +370,9 @@
             }
         }
 
-        // IMAGE HANDLER
         document.getElementById('set-profile-pic').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = () => { tempBase64Img = reader.result; }
+            const file = e.target.files[0]; const reader = new FileReader();
+            reader.onloadend = () => { tempBase64Img = reader.result; };
             if (file) reader.readAsDataURL(file);
         });
 
@@ -427,12 +414,9 @@
                 if(i.name.toLowerCase().includes(q)) pGrid.innerHTML += `<div class="product-card" onclick='addToCart(${JSON.stringify(i)})'><h4>${i.name}</h4><p>₹${i.price}</p></div>`;
             });
 
-            // UPDATED INVENTORY ROW (Includes Edit Button)
             document.getElementById('inventoryTableBody').innerHTML = inventory.map(i => `
                 <tr class="${i.stock <= 5 ? 'low-stock' : ''}">
-                    <td>${i.name}</td>
-                    <td>₹${i.price}</td>
-                    <td><b>${i.stock}</b></td>
+                    <td>${i.name}</td><td>₹${i.price}</td><td><b>${i.stock}</b></td>
                     <td>
                         <button class="btn btn-gray" style="color:var(--primary); margin-right:5px;" onclick="editProduct(${i.id})">Edit</button>
                         <button class="btn btn-gray" style="color:red;" onclick="deleteItem('inv', ${i.id})">Del</button>
@@ -443,15 +427,11 @@
             document.getElementById('customerTableBody').innerHTML = customers.map(c => `<tr><td><b>${c.name}</b></td><td>${c.phone}</td><td>₹${c.spent}</td><td>${c.id !== 1 ? `<button class="btn btn-gray" style="color:red;" onclick="deleteItem('cust', ${c.id})">Del</button>` : ''}</td></tr>`).join('');
             document.getElementById('historyTableBody').innerHTML = sales.slice().reverse().map(s => `<tr><td>#${s.id}</td><td>${s.date}</td><td>${s.cust}</td><td>₹${s.total}</td><td><button class="btn btn-blue" onclick="viewPastBill('${s.id}')">👁️</button> <button class="btn btn-danger" onclick="deleteSale('${s.id}')">🗑️</button></td></tr>`).join('');
             
-            filterCustomerDropdown();
-            saveToStorage();
+            filterCustomerDropdown(); saveToStorage();
         }
 
-        // --- NEW/UPDATED INVENTORY LOGIC ---
-
         function editProduct(id) {
-            const p = inventory.find(x => x.id === id);
-            if (!p) return;
+            const p = inventory.find(x => x.id === id); if (!p) return;
             editingProductId = id;
             document.getElementById('pName').value = p.name;
             document.getElementById('pPrice').value = p.price;
@@ -464,15 +444,9 @@
             const name = document.getElementById('pName').value;
             const price = parseFloat(document.getElementById('pPrice').value);
             const stock = parseInt(document.getElementById('pStock').value);
-
-            if (editingProductId) {
-                const p = inventory.find(x => x.id === editingProductId);
-                if (p) { p.name = name; p.price = price; p.stock = stock; }
-            } else {
-                inventory.push({id:Date.now(), name, price, stock});
-            }
-            closeModals(); 
-            refreshDisplays(); 
+            if (editingProductId) { const p = inventory.find(x => x.id === editingProductId); if (p) { p.name = name; p.price = price; p.stock = stock; } } 
+            else { inventory.push({id:Date.now(), name, price, stock}); }
+            closeModals(); refreshDisplays(); 
         }
 
         function openBulkModal() {
@@ -487,39 +461,24 @@
         }
 
         function saveBulkStock() {
-            const inputs = document.querySelectorAll('.bulk-qty-input');
-            let changed = false;
+            const inputs = document.querySelectorAll('.bulk-qty-input'); let changed = false;
             inputs.forEach(input => {
                 const addQty = parseInt(input.value);
-                if (!isNaN(addQty) && addQty !== 0) {
-                    const product = inventory.find(p => p.id == input.getAttribute('data-id'));
-                    if (product) { product.stock += addQty; changed = true; }
-                }
+                if (!isNaN(addQty) && addQty !== 0) { const product = inventory.find(p => p.id == input.getAttribute('data-id')); if (product) { product.stock += addQty; changed = true; } }
             });
-            if (changed) { 
-                alert("Stock updated successfully!"); 
-                refreshDisplays(); 
-            }
+            if (changed) { alert("Stock updated successfully!"); refreshDisplays(); }
             closeModals();
         }
 
         function closeModals() { 
-            editingProductId = null;
-            let pTitle = document.querySelector('#productModal h3');
-            if (pTitle) pTitle.innerText = "Product Info";
+            editingProductId = null; let pTitle = document.querySelector('#productModal h3'); if (pTitle) pTitle.innerText = "Product Info";
             document.querySelectorAll('.modal-bg').forEach(m => m.style.display='none'); 
-            document.getElementById('pName').value = '';
-            document.getElementById('pPrice').value = '';
-            document.getElementById('pStock').value = '';
+            document.getElementById('pName').value = ''; document.getElementById('pPrice').value = ''; document.getElementById('pStock').value = '';
         }
 
-        // --- REST OF ORIGINAL LOGIC ---
-
         function saveShopSettings() {
-            settings.name = document.getElementById('set-name').value;
-            settings.city = document.getElementById('set-city').value;
-            settings.gst = document.getElementById('set-gst').value;
-            settings.phone = document.getElementById('set-phone').value;
+            settings.name = document.getElementById('set-name').value; settings.city = document.getElementById('set-city').value;
+            settings.gst = document.getElementById('set-gst').value; settings.phone = document.getElementById('set-phone').value;
             settings.address = document.getElementById('set-address').value;
             if(tempBase64Img) { settings.profilePic = tempBase64Img; document.getElementById('sidebar-img').src = tempBase64Img; tempBase64Img = ""; }
             saveToStorage(); alert("Synced!"); initApp();
@@ -533,27 +492,21 @@
         }
 
         function completeSale() {
-            let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', ''));
-            if (total <= 0) return;
-            let cid = document.getElementById('posCustomerSelect').value;
-            let c = customers.find(x => x.id == cid);
+            let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', '')); if (total <= 0) return;
+            let cid = document.getElementById('posCustomerSelect').value; let c = customers.find(x => x.id == cid);
             const newSale = { id: Date.now().toString().slice(-6), date: new Date().toLocaleString(), cust: c.name, total, items: JSON.parse(JSON.stringify(cart)) };
-            sales.push(newSale);
-            c.spent += total;
+            sales.push(newSale); if(c) c.spent += total;
             cart.forEach(ci => { let invI = inventory.find(x => x.id == ci.id); if (invI) invI.stock -= ci.qty; });
-            generateReceiptHTML(newSale); window.print();
-            cart = []; updateCart(); refreshDisplays();
+            generateReceiptHTML(newSale); window.print(); cart = []; updateCart(); refreshDisplays();
         }
 
-        function generateReceiptHTML(s) {
-            document.getElementById('receipt-print-area').innerHTML = `<center><h2>${settings.name}</h2><p>${settings.address}<br>${settings.city}<br>GST: ${settings.gst}<br>PH: ${settings.phone}</p><hr></center><p>INV #${s.id} | ${s.date}</p><p>Customer: ${s.cust}</p><table style="width:100%; border-top:1px dashed #000;">${s.items.map(i => `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><h2 align="right" style="border-top:1px solid #000;">Total: ₹${s.total}</h2><center><p>*** Thank You! ***</p></center>`;
-        }
-
+        function generateReceiptHTML(s) { document.getElementById('receipt-print-area').innerHTML = `<center><h2>${settings.name}</h2><p>${settings.address}<br>${settings.city}<br>GST: ${settings.gst}<br>PH: ${settings.phone}</p><hr></center><p>INV #${s.id} | ${s.date}</p><p>Customer: ${s.cust}</p><table style="width:100%; border-top:1px dashed #000;">${s.items.map(i => `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><h2 align="right" style="border-top:1px solid #000;">Total: ₹${s.total}</h2><center><p>*** Thank You! ***</p></center>`; }
         function viewPastBill(id) {
             const s = sales.find(x => x.id === id);
             document.getElementById('billDetailContent').innerHTML = `<h3>Bill #${s.id}</h3><hr><table style="width:100%">${s.items.map(i => `<tr><td>${i.name} x${i.qty}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr><h2 align="right">Total: ₹${s.total}</h2><br><button class="btn btn-blue" style="width:100%" onclick="printExistingBill('${s.id}')">Re-Print</button><br><br><button class="btn btn-gray" style="width:100%" onclick="closeModals()">Close</button>`;
             document.getElementById('viewBillModal').style.display = 'flex';
         }
+        
         function printExistingBill(id) { generateReceiptHTML(sales.find(s=>s.id===id)); window.print(); }
         function deleteSale(id) { if(confirm("Delete bill?")) { sales = sales.filter(s => s.id !== id); refreshDisplays(); } }
         function updatePassword() { let p = document.getElementById('new-pass').value; if(p.length < 4) return alert("Too short"); appPass = p; saveToStorage(); alert("Changed!"); }
