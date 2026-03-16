@@ -237,8 +237,9 @@
                         </div>
 
                         <div style="display:flex; gap:10px; margin-top: 25px;">
-                            <button class="btn btn-warning" style="flex: 1; padding: 18px; font-size: 1em;" onclick="saveQuotation()">📝 QUOTE</button>
-                            <button class="btn btn-blue" style="flex: 2; padding: 18px; font-size: 1em;" onclick="completeSale()">✓ PRINT BILL</button>
+                            <button class="btn btn-warning" style="flex: 1; padding: 15px; font-size: 0.9em;" onclick="saveQuotation()">📝 QUOTE</button>
+                            <button class="btn btn-green" style="flex: 1.5; padding: 15px; font-size: 0.9em;" onclick="completeSale(true)">📱 SEND WA</button>
+                            <button class="btn btn-blue" style="flex: 1.5; padding: 15px; font-size: 0.9em;" onclick="completeSale(false)">✓ PRINT</button>
                         </div>
                     </div>
                 </div>
@@ -642,6 +643,7 @@
                                 if(matchIndex === -1) {
                                     combined.push(cItem);
                                 } else {
+                                    // If exists, Cloud is king, update local item
                                     combined[matchIndex] = cItem;
                                 }
                             });
@@ -664,7 +666,7 @@
                     }
                 }
                 
-                await saveToStorage(); 
+                await saveToStorage(); // Pushes the automatically merged data back to BOTH Cloud and Local
                 refreshDisplays();
                 document.getElementById('last-sync-time').innerText = "Last Sync: " + new Date().toLocaleTimeString();
                 
@@ -744,6 +746,7 @@
         async function saveToStorage() {
             const syncText = document.getElementById('sync-text'); if(syncText) { syncText.innerText = "Saving..."; syncText.style.color = "#ffc107"; }
             
+            // Always write to base local storage so offline mode ALWAYS works as a backup
             localStorage.setItem('l_pass', appPass); 
             localStorage.setItem('l_settings', JSON.stringify(settings));
             localStorage.setItem('l_inv', JSON.stringify(inventory)); 
@@ -754,6 +757,7 @@
             localStorage.setItem('l_quote', JSON.stringify(quotations));
             localStorage.setItem('l_cat', JSON.stringify(categories));
             
+            // Cloud Sync Layer
             if (currentUid !== "local" && docRef) {
                 try { 
                     if (window.location.protocol !== 'file:') { 
@@ -803,11 +807,12 @@
         function updateDropdowns() {
             const catSelect = document.getElementById('pCat'); 
             const posCatFilter = document.getElementById('posCategoryFilter');
-            let currentFilter = posCatFilter.value;
+            let currentFilter = posCatFilter.value; // Save current selection
             
             catSelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
             posCatFilter.innerHTML = '<option value="All">All Categories</option>' + categories.map(c => `<option value="${c}">${c}</option>`).join('');
-            if (currentFilter) posCatFilter.value = currentFilter; 
+            
+            if (currentFilter) posCatFilter.value = currentFilter; // Restore selection
             
             const supSelect = document.getElementById('pSupplier');
             let currentSup = supSelect.value;
@@ -1078,7 +1083,7 @@
             document.getElementById('dueTotal').innerText = "₹" + due.toFixed(2);
         }
 
-        function completeSale() {
+        function completeSale(isWhatsApp = false) {
             if (cart.length === 0) return; 
             let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', '')); let due = parseFloat(document.getElementById('dueTotal').innerText.replace('₹', '')) || 0;
             let discount = parseFloat(document.getElementById('posDiscount').value) || 0; let loyaltyUsed = parseFloat(document.getElementById('posLoyalty').value) || 0;
@@ -1102,7 +1107,13 @@
             if(c) { c.spent += total; c.due = (c.due || 0) + due; c.points = (c.points || 0) - loyaltyUsed + earnedPoints; }
             cart.forEach(ci => { let invI = inventory.find(x => x.id == ci.id); if (invI) invI.stock -= ci.qty; });
             
-            generateReceiptHTML(newSale, false); window.print(); 
+            generateReceiptHTML(newSale, false); 
+            
+            if(isWhatsApp) {
+                sendWhatsApp(saleId);
+            } else {
+                window.print(); 
+            }
             
             editingSaleId = null; editingSaleDate = null;
             resetCart(); refreshDisplays();
