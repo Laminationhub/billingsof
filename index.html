@@ -504,52 +504,72 @@
             reader.readAsDataURL(file);
         });
 
-        // SMART DATA LOADER
+        // SMART DATA LOADER (Universal Source of Truth)
         function loadLocalData() {
             appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN' };
             inventory = []; sales = []; expenses = []; customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
             suppliers = []; quotations = []; categories = ["General"];
             
-            // If logged into cloud, load the cached cloud base. Otherwise, load local base.
-            let prefix = currentUid === "local" ? "" : `_${currentUid}`;
-            try { if(localStorage.getItem(`l_pass${prefix}`)) appPass = localStorage.getItem(`l_pass${prefix}`); } catch(e){}
-            try { if(localStorage.getItem(`l_settings${prefix}`)) settings = JSON.parse(localStorage.getItem(`l_settings${prefix}`)); } catch(e){}
-            try { if(localStorage.getItem(`l_inv${prefix}`)) inventory = JSON.parse(localStorage.getItem(`l_inv${prefix}`)); } catch(e){}
-            try { if(localStorage.getItem(`l_sales${prefix}`)) sales = JSON.parse(localStorage.getItem(`l_sales${prefix}`)); } catch(e){}
-            try { if(localStorage.getItem(`l_exp${prefix}`)) expenses = JSON.parse(localStorage.getItem(`l_exp${prefix}`)); } catch(e){}
-            try { if(localStorage.getItem(`l_cust${prefix}`)) customers = JSON.parse(localStorage.getItem(`l_cust${prefix}`)); } catch(e){}
-            try { if(localStorage.getItem(`l_sup${prefix}`)) suppliers = JSON.parse(localStorage.getItem(`l_sup${prefix}`)); } catch(e){}
-            try { if(localStorage.getItem(`l_quote${prefix}`)) quotations = JSON.parse(localStorage.getItem(`l_quote${prefix}`)); } catch(e){}
-            try { if(localStorage.getItem(`l_cat${prefix}`)) categories = JSON.parse(localStorage.getItem(`l_cat${prefix}`)); } catch(e){}
+            try { if(localStorage.getItem('l_pass')) appPass = localStorage.getItem('l_pass'); } catch(e){}
+            try { if(localStorage.getItem('l_settings')) settings = JSON.parse(localStorage.getItem('l_settings')); } catch(e){}
+            try { if(localStorage.getItem('l_inv')) inventory = JSON.parse(localStorage.getItem('l_inv')); } catch(e){}
+            try { if(localStorage.getItem('l_sales')) sales = JSON.parse(localStorage.getItem('l_sales')); } catch(e){}
+            try { if(localStorage.getItem('l_exp')) expenses = JSON.parse(localStorage.getItem('l_exp')); } catch(e){}
+            try { if(localStorage.getItem('l_cust')) customers = JSON.parse(localStorage.getItem('l_cust')); } catch(e){}
+            try { if(localStorage.getItem('l_sup')) suppliers = JSON.parse(localStorage.getItem('l_sup')); } catch(e){}
+            try { if(localStorage.getItem('l_quote')) quotations = JSON.parse(localStorage.getItem('l_quote')); } catch(e){}
+            try { if(localStorage.getItem('l_cat')) categories = JSON.parse(localStorage.getItem('l_cat')); } catch(e){}
         }
 
-        // BACKGROUND SYNC BEFORE UNLOCK & AUTO SYNC
-        async function silentCloudPull() {
-            if (docRef && window.location.protocol !== 'file:') { 
-                try {
-                    const doc = await docRef.get();
-                    if (doc.exists) { 
-                        const d = doc.data(); 
-                        if (d && Object.keys(d).length > 0) { 
-                            appPass = d.appPass || appPass; settings = d.settings || settings; inventory = d.inventory || inventory; 
-                            sales = d.sales || sales; expenses = d.expenses || expenses; customers = d.customers || customers; 
-                            suppliers = d.suppliers || suppliers; quotations = d.quotations || quotations; categories = d.categories || categories;
+        // NEW: FULLY AUTOMATIC CLOUD SYNC & MERGE
+        async function autoSyncMerge() {
+            if (!docRef || window.location.protocol === 'file:') return;
+            
+            try {
+                const doc = await docRef.get();
+                if (doc.exists) {
+                    const c = doc.data();
+                    
+                    const mergeArrays = (localArr, cloudArr) => {
+                        let combined = [...localArr];
+                        if(cloudArr && Array.isArray(cloudArr)) {
+                            cloudArr.forEach(cItem => {
+                                if(!combined.find(lItem => lItem.id === cItem.id)) {
+                                    combined.push(cItem);
+                                }
+                            });
                         }
-                    } else {
-                        // Brand new cloud account! Let's push whatever local data we already had.
-                        await saveToStorage();
+                        return combined;
+                    };
+
+                    inventory = mergeArrays(inventory, c.inventory || []);
+                    sales = mergeArrays(sales, c.sales || []);
+                    expenses = mergeArrays(expenses, c.expenses || []);
+                    customers = mergeArrays(customers, c.customers || []);
+                    suppliers = mergeArrays(suppliers, c.suppliers || []);
+                    quotations = mergeArrays(quotations, c.quotations || []);
+                    
+                    let c_cat = c.categories || ["General"];
+                    c_cat.forEach(cat => { if(!categories.includes(cat)) categories.push(cat); });
+
+                    if(c.settings && (!settings.name || settings.name === 'Lamination Hub')) {
+                        settings = c.settings;
                     }
-                    document.getElementById('last-sync-time').innerText = "Last pull: " + new Date().toLocaleTimeString();
-                } catch(e) {}
+                }
+                
+                await saveToStorage(); // Pushes the automatically merged data back to BOTH Cloud and Local
+                refreshDisplays();
+                document.getElementById('last-sync-time').innerText = "Last Sync: " + new Date().toLocaleTimeString();
+                
+            } catch(e) {
+                console.error("Auto Sync Error:", e);
             }
         }
 
         // AUTO BACKGROUND SYNC EVERY 60 SECONDS
         setInterval(async () => {
             if (currentUid !== "local" && userRole === 'admin') {
-                const prevSalesLength = sales.length;
-                await silentCloudPull();
-                if (sales.length !== prevSalesLength) refreshDisplays();
+                await autoSyncMerge();
             }
         }, 60000);
 
@@ -557,9 +577,9 @@
             if (user) {
                 currentUid = user.uid; docRef = db.collection("shops").doc(currentUid); 
                 document.getElementById('current-user-email').innerText = user.email;
-                document.getElementById('login-status').innerText = "Syncing with Cloud...";
+                document.getElementById('login-status').innerText = "Auto-Syncing with Cloud...";
                 loadLocalData(); 
-                await silentCloudPull();
+                await autoSyncMerge();
                 document.getElementById('login-status').innerText = "Secured. Enter Admin or Staff PIN.";
             }
         });
@@ -571,9 +591,9 @@
                 const result = await auth.signInWithPopup(provider); 
                 currentUid = result.user.uid; docRef = db.collection("shops").doc(currentUid); 
                 document.getElementById('current-user-email').innerText = result.user.email;
-                document.getElementById('login-status').innerText = "Syncing with Cloud...";
+                document.getElementById('login-status').innerText = "Auto-Syncing with Cloud...";
                 loadLocalData(); 
-                await silentCloudPull();
+                await autoSyncMerge();
                 document.getElementById('login-status').innerText = "Secured. Enter Admin or Staff PIN.";
                 document.getElementById('googleLoginBtn').innerText = "Cloud Connected";
             } catch (error) { alert("Login Failed: " + error.message); document.getElementById('googleLoginBtn').innerHTML = `<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"> Sign in with Google`; }
@@ -627,18 +647,11 @@
             localStorage.setItem('l_sup', JSON.stringify(suppliers)); 
             localStorage.setItem('l_quote', JSON.stringify(quotations));
             localStorage.setItem('l_cat', JSON.stringify(categories));
-
-            // 2. If logged in, ALSO write to specific user profile AND cloud
-            if (currentUid !== "local") {
-                let prefix = `_${currentUid}`;
-                localStorage.setItem(`l_pass${prefix}`, appPass); localStorage.setItem(`l_settings${prefix}`, JSON.stringify(settings));
-                localStorage.setItem(`l_inv${prefix}`, JSON.stringify(inventory)); localStorage.setItem(`l_sales${prefix}`, JSON.stringify(sales));
-                localStorage.setItem(`l_exp${prefix}`, JSON.stringify(expenses)); localStorage.setItem(`l_cust${prefix}`, JSON.stringify(customers));
-                localStorage.setItem(`l_sup${prefix}`, JSON.stringify(suppliers)); localStorage.setItem(`l_quote${prefix}`, JSON.stringify(quotations));
-                localStorage.setItem(`l_cat${prefix}`, JSON.stringify(categories));
-                
+            
+            // 2. Cloud Sync Layer
+            if (currentUid !== "local" && docRef) {
                 try { 
-                    if (docRef && window.location.protocol !== 'file:') { 
+                    if (window.location.protocol !== 'file:') { 
                         await docRef.set({ appPass, settings, inventory, sales, expenses, customers, suppliers, quotations, categories }); 
                         if(syncText) { syncText.innerText = "Synced"; syncText.style.color = "#28a745"; document.getElementById('last-sync-time').innerText = "Last push: " + new Date().toLocaleTimeString(); } 
                     } 
@@ -1028,7 +1041,7 @@
             refreshDisplays();
         }
 
-        // New: Customer Specific Payment
+        // Customer Specific Payment
         function openCustomerPaymentModal(id) {
             let c = customers.find(x => x.id === id);
             if(!c || !c.due) return;
