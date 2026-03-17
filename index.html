@@ -198,7 +198,7 @@
                         <table style="margin-bottom: 10px; width: 100%;"><tbody id="cartBody"></tbody></table>
                         
                         <div class="checkout-row">
-                            <span style="font-weight: bold; color: #64748b; font-size: 0.9em;">TAX (%) [INCL.]</span>
+                            <span style="font-weight: bold; color: #64748b; font-size: 0.9em;">TAX (%)</span>
                             <input type="number" id="posTax" placeholder="Auto" style="width: 100px; padding: 8px; text-align: right; border: 1px solid #cbd5e1; border-radius: 5px;" oninput="updateCart()" min="0">
                         </div>
 
@@ -274,13 +274,34 @@
                 </div>
 
                 <div class="container">
-                    <h3>🏢 Business Profile</h3>
+                    <h3>🏢 Business Profile & Tax</h3>
                     <div class="form-group"><label>Profile Picture</label><input type="file" id="set-profile-pic" accept="image/*"></div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                         <div class="form-group"><label>Shop Name</label><input type="text" id="set-name"></div>
-                        <div class="form-group"><label>GSTIN Number</label><input type="text" id="set-gst" placeholder="Fills default 18% Tax if set"></div>
+                        <div class="form-group"><label>GSTIN Number</label><input type="text" id="set-gst"></div>
                         <div class="form-group"><label>City/Branch</label><input type="text" id="set-city"></div>
                         <div class="form-group"><label>Contact Number</label><input type="text" id="set-phone"></div>
+                        
+                        <div class="form-group">
+                            <label>Default Tax Rate (%)</label>
+                            <div style="display: flex; gap: 10px;">
+                                <select id="tax-dropdown" onchange="handleTaxDropdown()" style="margin-bottom: 8px; flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; outline: none;">
+                                    </select>
+                                <button id="btn-delete-tax" class="btn btn-danger" style="display: none; padding: 12px 15px; margin-bottom: 8px;" onclick="deleteCustomTaxRate()" title="Delete this rate">🗑️</button>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="number" id="set-tax-rate" placeholder="Enter Custom %" style="display: none; flex: 1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; outline: none;">
+                                <button id="btn-save-tax" class="btn btn-green" style="display: none; padding: 12px 20px;" onclick="saveCustomTaxRate()">Save Rate</button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Tax Calculation Mode</label>
+                            <select id="set-tax-mode">
+                                <option value="EXCLUSIVE">Exclusive (Add to Bill)</option>
+                                <option value="INCLUSIVE">Inclusive (Inside Price)</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="form-group"><label>Full Address</label><textarea id="set-address" rows="2"></textarea></div>
                     <button class="btn btn-blue" onclick="saveShopSettings()">Update Settings</button>
@@ -339,7 +360,7 @@
 
             <div id="quotations-view" class="view-section">
                 <div class="header"><h1>Saved Quotations</h1></div>
-                <div class="container" style="padding:0;"><div class="table-wrap"><table><thead><tr><th>QUOTE #</th><th>Date</th><th>Customer</th><th>Tax(Inc.)</th><th>Total Amt</th><th>Actions</th></tr></thead><tbody id="quotationTableBody"></tbody></table></div></div>
+                <div class="container" style="padding:0;"><div class="table-wrap"><table><thead><tr><th>QUOTE #</th><th>Date</th><th>Customer</th><th>Tax</th><th>Total Amt</th><th>Actions</th></tr></thead><tbody id="quotationTableBody"></tbody></table></div></div>
             </div>
             
             <div id="customers-view" class="view-section">
@@ -579,7 +600,7 @@
 
         // DATA STATE
         let appPass = '1234';
-        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN' };
+        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [] };
         let inventory = []; let sales = []; let expenses = []; let customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
         let suppliers = []; let quotations = []; let categories = ["General"]; 
         let cart = []; let custTrigger = "list"; let tempBase64Img = ""; let editingProductId = null;
@@ -609,9 +630,9 @@
             reader.readAsDataURL(file);
         });
 
-        // SMART DATA LOADER (Universal Source of Truth)
+        // SMART DATA LOADER
         function loadLocalData() {
-            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN' };
+            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [] };
             inventory = []; sales = []; expenses = []; customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
             suppliers = []; quotations = []; categories = ["General"];
             
@@ -643,7 +664,6 @@
                                 if(matchIndex === -1) {
                                     combined.push(cItem);
                                 } else {
-                                    // If exists, Cloud is king, update local item
                                     combined[matchIndex] = cItem;
                                 }
                             });
@@ -666,7 +686,7 @@
                     }
                 }
                 
-                await saveToStorage(); // Pushes the automatically merged data back to BOTH Cloud and Local
+                await saveToStorage(); 
                 refreshDisplays();
                 document.getElementById('last-sync-time').innerText = "Last Sync: " + new Date().toLocaleTimeString();
                 
@@ -675,7 +695,6 @@
             }
         }
 
-        // AUTO BACKGROUND SYNC EVERY 60 SECONDS
         setInterval(async () => {
             if (currentUid !== "local" && userRole === 'admin') {
                 await autoSyncMerge();
@@ -746,7 +765,6 @@
         async function saveToStorage() {
             const syncText = document.getElementById('sync-text'); if(syncText) { syncText.innerText = "Saving..."; syncText.style.color = "#ffc107"; }
             
-            // Always write to base local storage so offline mode ALWAYS works as a backup
             localStorage.setItem('l_pass', appPass); 
             localStorage.setItem('l_settings', JSON.stringify(settings));
             localStorage.setItem('l_inv', JSON.stringify(inventory)); 
@@ -757,7 +775,6 @@
             localStorage.setItem('l_quote', JSON.stringify(quotations));
             localStorage.setItem('l_cat', JSON.stringify(categories));
             
-            // Cloud Sync Layer
             if (currentUid !== "local" && docRef) {
                 try { 
                     if (window.location.protocol !== 'file:') { 
@@ -783,13 +800,29 @@
             document.getElementById('set-name').value = settings.name; document.getElementById('set-city').value = settings.city;
             document.getElementById('set-gst').value = settings.gst || ''; document.getElementById('set-phone').value = settings.phone || ''; document.getElementById('set-address').value = settings.address || '';
             document.getElementById('set-staff-pin').value = settings.staffPin || ''; document.getElementById('set-printer').value = settings.printerSize || 'A4'; document.getElementById('set-lang').value = settings.receiptLanguage || 'EN';
+            
+            renderTaxDropdown(); // Build the options first
+
+            document.getElementById('set-tax-rate').value = settings.taxRate || 0;
+            let savedTax = (settings.taxRate || 0).toString();
+            let taxDropdown = document.getElementById('tax-dropdown');
+
+            // Check if the saved tax rate exists in the newly generated dropdown
+            let optionExists = Array.from(taxDropdown.options).some(opt => opt.value === savedTax);
+
+            if (optionExists && savedTax !== 'custom') {
+                taxDropdown.value = savedTax;
+            } else {
+                taxDropdown.value = "custom";
+                document.getElementById('set-tax-rate').value = savedTax;
+            }
+            handleTaxDropdown(); // Automatically displays the correct buttons and inputs
+
+            document.getElementById('set-tax-mode').value = settings.taxMode || 'EXCLUSIVE';
+            
             if(settings.profilePic) document.getElementById('sidebar-img').src = settings.profilePic;
 
-            if (settings.gst && settings.gst.trim() !== "") {
-                document.getElementById('posTax').placeholder = "Auto (18%)";
-            } else {
-                document.getElementById('posTax').placeholder = "0";
-            }
+            document.getElementById('posTax').placeholder = settings.taxRate ? `Auto (${settings.taxRate}%)` : "0";
 
             const adminOnlyTabs = ['nav-dashboard', 'nav-expenses', 'nav-settings', 'nav-suppliers', 'nav-quotations'];
             adminOnlyTabs.forEach(id => { document.getElementById(id).style.display = userRole === 'admin' ? 'flex' : 'none'; });
@@ -797,6 +830,96 @@
             if (userRole === 'staff' && !['pos-view', 'inventory-view', 'history-view', 'customers-view'].includes(document.querySelector('.view-section.active').id)) {
                 switchTab('pos');
             } else { refreshDisplays(); }
+        }
+
+        // Builds the dropdown menu dynamically with ALL rates stored as custom deletable rates
+        function renderTaxDropdown() {
+            const dropdown = document.getElementById('tax-dropdown');
+            
+            // Upgrade rule: If this is the first time running this new code, copy the hardcoded defaults into the user's custom settings so they can be deleted.
+            if (!settings.taxMenuInitialized) {
+                let existingCustom = settings.customTaxRates || [];
+                settings.customTaxRates = [...new Set([0, 5, 12, 18, 28, ...existingCustom])].sort((a,b) => a-b);
+                settings.taxMenuInitialized = true;
+                saveToStorage();
+            }
+
+            let allRates = [...settings.customTaxRates].sort((a,b) => a-b);
+            
+            let html = '';
+            allRates.forEach(rate => {
+                let label = rate === 0 ? "0% (No Tax)" : `${rate}%`;
+                html += `<option value="${rate}">${label}</option>`;
+            });
+            html += `<option value="custom">Add Manual Tax...</option>`;
+            
+            dropdown.innerHTML = html;
+        }
+
+        // Shows/Hides the manual input, Save button, and Delete button
+        function handleTaxDropdown() {
+            const dropdown = document.getElementById('tax-dropdown');
+            const manualInput = document.getElementById('set-tax-rate');
+            const saveBtn = document.getElementById('btn-save-tax');
+            const deleteBtn = document.getElementById('btn-delete-tax');
+            
+            let val = dropdown.value;
+            
+            if (val === 'custom') {
+                manualInput.style.display = 'block';
+                saveBtn.style.display = 'block';
+                deleteBtn.style.display = 'none';
+                manualInput.value = ''; 
+                manualInput.focus();
+            } else {
+                manualInput.style.display = 'none';
+                saveBtn.style.display = 'none';
+                manualInput.value = val; 
+                
+                // Always show the Delete button for every rate in the list now!
+                deleteBtn.style.display = 'block';
+            }
+        }
+
+        // Saves the new manual rate to your settings and updates the dropdown
+        function saveCustomTaxRate() {
+            let newVal = parseFloat(document.getElementById('set-tax-rate').value);
+            if (isNaN(newVal) || newVal < 0) return alert("Please enter a valid tax percentage.");
+            
+            if (!settings.customTaxRates) settings.customTaxRates = []; // Ensure array exists
+            
+            // Check if it already exists to prevent duplicates
+            if (!settings.customTaxRates.includes(newVal)) {
+                settings.customTaxRates.push(newVal);
+                saveToStorage(); // Sync to cloud/local storage
+                alert(`Tax rate ${newVal}% saved to your dropdown menu!`);
+            }
+            
+            // Refresh the dropdown and auto-select the new value
+            renderTaxDropdown();
+            document.getElementById('tax-dropdown').value = newVal.toString();
+            handleTaxDropdown(); 
+        }
+
+        // Deletes any rate from settings
+        function deleteCustomTaxRate() {
+            let val = parseFloat(document.getElementById('tax-dropdown').value);
+            if(confirm(`Are you sure you want to completely remove ${val}% from your saved tax rates?`)) {
+                // Remove from the custom array
+                settings.customTaxRates = settings.customTaxRates.filter(r => r !== val);
+                saveToStorage();
+                
+                // Re-render and select the first available option
+                renderTaxDropdown();
+                
+                if(settings.customTaxRates.length > 0) {
+                    document.getElementById('tax-dropdown').value = settings.customTaxRates[0].toString();
+                } else {
+                    document.getElementById('tax-dropdown').value = 'custom';
+                }
+                
+                handleTaxDropdown();
+            }
         }
 
         function switchTab(t) {
@@ -807,12 +930,11 @@
         function updateDropdowns() {
             const catSelect = document.getElementById('pCat'); 
             const posCatFilter = document.getElementById('posCategoryFilter');
-            let currentFilter = posCatFilter.value; // Save current selection
+            let currentFilter = posCatFilter.value;
             
             catSelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
             posCatFilter.innerHTML = '<option value="All">All Categories</option>' + categories.map(c => `<option value="${c}">${c}</option>`).join('');
-            
-            if (currentFilter) posCatFilter.value = currentFilter; // Restore selection
+            if (currentFilter) posCatFilter.value = currentFilter; 
             
             const supSelect = document.getElementById('pSupplier');
             let currentSup = supSelect.value;
@@ -1020,7 +1142,26 @@
         function saveBulkStock() { let changed = false; document.querySelectorAll('.bulk-qty-input').forEach(input => { const addQty = parseInt(input.value); if (!isNaN(addQty) && addQty !== 0) { const p = inventory.find(x => x.id == input.getAttribute('data-id')); if (p) { p.stock += addQty; changed = true; } } }); if (changed) { alert("Stock updated!"); refreshDisplays(); } closeModals(); }
         
         function closeModals() { editingProductId = null; let pTitle = document.querySelector('#productModal h3'); if (pTitle) pTitle.innerText = "Product Info"; closeScanner(); document.querySelectorAll('.modal-bg').forEach(m => m.style.display='none'); document.querySelectorAll('input:not(#posSearch):not(#passInput):not(.search-bar):not([name="supType"])').forEach(i => i.value=''); }
-        function saveShopSettings() { settings.name = document.getElementById('set-name').value; settings.city = document.getElementById('set-city').value; settings.gst = document.getElementById('set-gst').value; settings.phone = document.getElementById('set-phone').value; settings.address = document.getElementById('set-address').value; settings.staffPin = document.getElementById('set-staff-pin').value; settings.printerSize = document.getElementById('set-printer').value; settings.receiptLanguage = document.getElementById('set-lang').value; if(tempBase64Img) { settings.profilePic = tempBase64Img; document.getElementById('sidebar-img').src = tempBase64Img; tempBase64Img = ""; } saveToStorage(); alert("Settings Saved!"); initApp(); }
+        
+        function saveShopSettings() { 
+            settings.name = document.getElementById('set-name').value; 
+            settings.city = document.getElementById('set-city').value; 
+            settings.gst = document.getElementById('set-gst').value; 
+            settings.phone = document.getElementById('set-phone').value; 
+            settings.address = document.getElementById('set-address').value; 
+            settings.staffPin = document.getElementById('set-staff-pin').value; 
+            settings.printerSize = document.getElementById('set-printer').value; 
+            settings.receiptLanguage = document.getElementById('set-lang').value; 
+            settings.taxRate = parseFloat(document.getElementById('set-tax-rate').value) || 0;
+            settings.taxMode = document.getElementById('set-tax-mode').value;
+            
+            if(tempBase64Img) { 
+                settings.profilePic = tempBase64Img; 
+                document.getElementById('sidebar-img').src = tempBase64Img; 
+                tempBase64Img = ""; 
+            } 
+            saveToStorage(); alert("Settings Saved!"); initApp(); 
+        }
 
         // --- POS, TAX, QUOTE AND LOYALTY LOGIC ---
         function addCustomItem() {
@@ -1051,16 +1192,48 @@
         
         function removeFromCart(id) { cart = cart.filter(c => String(c.id) !== String(id)); updateCart(); }
 
+        // Cart Quantity Increment/Decrement
+        function decreaseQty(id) {
+            let item = cart.find(c => String(c.id) === String(id));
+            if(item) {
+                if(item.qty > 1) {
+                    item.qty--;
+                } else {
+                    cart = cart.filter(c => String(c.id) !== String(id));
+                }
+                updateCart();
+            }
+        }
+
+        function increaseQty(id) {
+            let item = cart.find(c => String(c.id) === String(id));
+            if(item) {
+                item.qty++;
+                updateCart();
+            }
+        }
+
         function updateCart() {
             let cid = document.getElementById('posCustomerSelect').value; let c = customers.find(x => x.id == cid);
             document.getElementById('availPoints').innerText = c ? (c.points || 0) : 0;
             
-            let subtotal = 0; document.getElementById('cartBody').innerHTML = cart.map(i => { 
+            let subtotal = 0; 
+            
+            // UPDATED POS CART RENDERING WITH +/- BUTTONS
+            document.getElementById('cartBody').innerHTML = cart.map(i => { 
                 subtotal += i.price*i.qty; 
                 return `<tr>
-                    <td style="color:#dc3545; cursor:pointer; font-weight:bold; padding-right:10px; font-size:1.1em;" onclick="removeFromCart('${i.id}')">✕</td>
-                    <td style="width:100%;">${i.name} <br><small>${i.brand||''}</small> x${i.qty} ${i.unit||'pcs'}</td>
-                    <td align="right">₹${i.price*i.qty}</td>
+                    <td style="color:#dc3545; cursor:pointer; font-weight:bold; padding-right:10px; font-size:1.1em; vertical-align:middle;" onclick="removeFromCart('${i.id}')">✕</td>
+                    <td style="width:100%; vertical-align:middle;">
+                        ${i.name} <br><small>${i.brand||''}</small>
+                        <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                            <button onclick="decreaseQty('${i.id}')" style="width:24px; height:24px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; padding:0;">-</button>
+                            <span style="font-size:0.9em; font-weight:bold; min-width:15px; text-align:center;">${i.qty}</span>
+                            <button onclick="increaseQty('${i.id}')" style="width:24px; height:24px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; padding:0;">+</button>
+                            <small style="color:#64748b; margin-left:5px;">${i.unit||'pcs'}</small>
+                        </div>
+                    </td>
+                    <td align="right" style="vertical-align:middle; font-weight:bold;">₹${i.price*i.qty}</td>
                 </tr>`; 
             }).join('');
             
@@ -1070,12 +1243,22 @@
             let taxableAmount = subtotal - discount; if(taxableAmount < 0) taxableAmount = 0;
             
             let taxPercentInput = document.getElementById('posTax').value;
-            let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : ((settings.gst && settings.gst.trim() !== "") ? 18 : 0);
+            let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : (settings.taxRate || 0);
+            let taxMode = settings.taxMode || 'EXCLUSIVE';
             
-            let baseAmount = taxableAmount / (1 + (taxPercent / 100));
-            let taxAmount = taxableAmount - baseAmount;
+            let taxAmount = 0;
+            let grandTotal = 0;
+            
+            if(taxMode === 'INCLUSIVE') {
+                let baseAmount = taxableAmount / (1 + (taxPercent / 100));
+                taxAmount = taxableAmount - baseAmount;
+                grandTotal = taxableAmount - loyaltyUsed;
+            } else {
+                taxAmount = taxableAmount * (taxPercent / 100);
+                grandTotal = taxableAmount + taxAmount - loyaltyUsed;
+            }
 
-            let grandTotal = taxableAmount - loyaltyUsed; if(grandTotal < 0) grandTotal = 0; 
+            if(grandTotal < 0) grandTotal = 0; 
             document.getElementById('grandTotal').innerText = "₹" + grandTotal.toFixed(2);
 
             let advanceInput = document.getElementById('posAdvance').value; let due = 0;
@@ -1083,16 +1266,23 @@
             document.getElementById('dueTotal').innerText = "₹" + due.toFixed(2);
         }
 
-        function completeSale(isWhatsApp = false) {
+        function completeSale() {
             if (cart.length === 0) return; 
             let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', '')); let due = parseFloat(document.getElementById('dueTotal').innerText.replace('₹', '')) || 0;
             let discount = parseFloat(document.getElementById('posDiscount').value) || 0; let loyaltyUsed = parseFloat(document.getElementById('posLoyalty').value) || 0;
             
-            let taxPercentInput = document.getElementById('posTax').value;
-            let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : ((settings.gst && settings.gst.trim() !== "") ? 18 : 0);
             let taxableAmount = cart.reduce((a,b)=>a+(b.price*b.qty),0) - discount;
-            let baseAmount = taxableAmount / (1 + (taxPercent / 100));
-            let taxAmount = taxableAmount - baseAmount;
+            let taxPercentInput = document.getElementById('posTax').value;
+            let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : (settings.taxRate || 0);
+            let taxMode = settings.taxMode || 'EXCLUSIVE';
+            
+            let taxAmount = 0;
+            if(taxMode === 'INCLUSIVE') {
+                let baseAmount = taxableAmount / (1 + (taxPercent / 100));
+                taxAmount = taxableAmount - baseAmount;
+            } else {
+                taxAmount = taxableAmount * (taxPercent / 100);
+            }
             
             let payMode = document.getElementById('posPayMode').value;
             let cid = document.getElementById('posCustomerSelect').value; let c = customers.find(x => x.id == cid);
@@ -1101,19 +1291,13 @@
             let saleId = editingSaleId ? editingSaleId : Date.now().toString().slice(-6);
             let saleDate = editingSaleDate ? editingSaleDate : new Date().toLocaleString();
 
-            const newSale = { id: saleId, date: saleDate, cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxPercent: taxPercent, due: due, discount: discount, loyaltyUsed: loyaltyUsed, earnedPoints: earnedPoints, photo: currentOrderPhotoBase64, payMode: payMode, items: JSON.parse(JSON.stringify(cart)), returned: false };
+            const newSale = { id: saleId, date: saleDate, cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxPercent: taxPercent, taxMode: taxMode, due: due, discount: discount, loyaltyUsed: loyaltyUsed, earnedPoints: earnedPoints, photo: currentOrderPhotoBase64, payMode: payMode, items: JSON.parse(JSON.stringify(cart)), returned: false };
             sales.push(newSale); 
             
             if(c) { c.spent += total; c.due = (c.due || 0) + due; c.points = (c.points || 0) - loyaltyUsed + earnedPoints; }
             cart.forEach(ci => { let invI = inventory.find(x => x.id == ci.id); if (invI) invI.stock -= ci.qty; });
             
-            generateReceiptHTML(newSale, false); 
-            
-            if(isWhatsApp) {
-                sendWhatsApp(saleId);
-            } else {
-                window.print(); 
-            }
+            generateReceiptHTML(newSale, false); window.print(); 
             
             editingSaleId = null; editingSaleDate = null;
             resetCart(); refreshDisplays();
@@ -1124,15 +1308,22 @@
             let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', ''));
             let discount = parseFloat(document.getElementById('posDiscount').value) || 0;
             
-            let taxPercentInput = document.getElementById('posTax').value;
-            let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : ((settings.gst && settings.gst.trim() !== "") ? 18 : 0);
             let taxableAmount = cart.reduce((a,b)=>a+(b.price*b.qty),0) - discount;
-            let baseAmount = taxableAmount / (1 + (taxPercent / 100));
-            let taxAmount = taxableAmount - baseAmount;
+            let taxPercentInput = document.getElementById('posTax').value;
+            let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : (settings.taxRate || 0);
+            let taxMode = settings.taxMode || 'EXCLUSIVE';
+            
+            let taxAmount = 0;
+            if(taxMode === 'INCLUSIVE') {
+                let baseAmount = taxableAmount / (1 + (taxPercent / 100));
+                taxAmount = taxableAmount - baseAmount;
+            } else {
+                taxAmount = taxableAmount * (taxPercent / 100);
+            }
 
             let cid = document.getElementById('posCustomerSelect').value; let c = customers.find(x => x.id == cid);
 
-            const newQuote = { id: 'Q' + Date.now().toString().slice(-5), date: new Date().toLocaleString(), cust: c.name, phone: c.phone, total: total, tax: taxAmount, discount: discount, items: JSON.parse(JSON.stringify(cart)) };
+            const newQuote = { id: 'Q' + Date.now().toString().slice(-5), date: new Date().toLocaleString(), cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxMode: taxMode, discount: discount, items: JSON.parse(JSON.stringify(cart)) };
             quotations.push(newQuote);
             
             generateReceiptHTML(newQuote, true); window.print();
@@ -1208,10 +1399,10 @@
         // --- THERMAL PRINTER & TRANSLATION ENGINE ---
         function generateReceiptHTML(s, isQuote = false) { 
             const L = settings.receiptLanguage === 'HI' ? {
-                inv: isQuote ? "कोटेशन" : "रसीद", date: "दिनांक", cust: "ग्राहक", disc: "छूट", cgst: "CGST (शामिल)", sgst: "SGST (शामिल)", pts: "उपयोग किए गए अंक", due: "बकाया राशि",
+                inv: isQuote ? "कोटेशन" : "रसीद", date: "दिनांक", cust: "ग्राहक", disc: "छूट", cgst: "CGST", sgst: "SGST", pts: "उपयोग किए गए अंक", due: "बकाया राशि",
                 total: "कुल राशि", thx: isQuote ? "*** कोटेशन मान्य 15 दिन ***" : "*** धन्यवाद! ***", earned: "⭐ आपने अंक अर्जित किए:", gst: "जीएसटी", pmode: "भुगतान मोड"
             } : {
-                inv: isQuote ? "QUOTATION" : "INV", date: "Date", cust: "Customer", disc: "Discount", cgst: "Incl. CGST", sgst: "Incl. SGST", pts: "Pts Used", due: "Amount Due",
+                inv: isQuote ? "QUOTATION" : "INV", date: "Date", cust: "Customer", disc: "Discount", cgst: "CGST", sgst: "SGST", pts: "Pts Used", due: "Amount Due",
                 total: "Total", thx: isQuote ? "*** Estimate Valid for 15 Days ***" : "*** Thank You! ***", earned: "⭐ You earned Points:", gst: "GSTIN", pmode: "Pay Mode"
             };
 
@@ -1229,10 +1420,11 @@
 
             let extras = "";
             if (s.discount > 0) extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize};">${L.disc}: -₹${s.discount}</div>`;
-            if (s.tax > 0 && settings.gst && settings.gst.trim() !== "") {
+            if (s.tax > 0) {
                 let halfTax = (s.tax / 2).toFixed(2);
-                extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize}; color:#555;">${L.cgst}: ₹${halfTax}</div>`;
-                extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize}; color:#555;">${L.sgst}: ₹${halfTax}</div>`;
+                let taxModeStr = s.taxMode === 'INCLUSIVE' ? '(Incl.)' : '(Added)';
+                extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize}; color:#555;">${L.cgst} ${taxModeStr}: ₹${halfTax}</div>`;
+                extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize}; color:#555;">${L.sgst} ${taxModeStr}: ₹${halfTax}</div>`;
             }
             if (s.loyaltyUsed > 0) extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize};">${L.pts}: -₹${s.loyaltyUsed}</div>`;
             if (s.due > 0 && !isQuote) extras += `<div style="text-align:right; margin:4px 0; color:red; font-size:${fSize};">${L.due}: ₹${s.due}</div>`;
@@ -1262,14 +1454,15 @@
         
         function sendWhatsApp(id) {
             const s = sales.find(x => x.id === id); if (!s) return;
-            const L = settings.receiptLanguage === 'HI' ? { inv: "रसीद", date: "दिनांक", cust: "ग्राहक", disc: "छूट", cgst: "CGST (शामिल)", sgst: "SGST (शामिल)", pts: "अंक", due: "बकाया", total: "कुल", thx: "धन्यवाद!", pmode: "भुगतान मोड" } : { inv: "Invoice", date: "Date", cust: "Customer", disc: "Discount", cgst: "Incl. CGST", sgst: "Incl. SGST", pts: "Pts Used", due: "Pending Due", total: "Grand Total", thx: "Thank you for your business!", pmode: "Pay Mode" };
+            const L = settings.receiptLanguage === 'HI' ? { inv: "रसीद", date: "दिनांक", cust: "ग्राहक", disc: "छूट", cgst: "CGST", sgst: "SGST", pts: "अंक", due: "बकाया", total: "कुल", thx: "धन्यवाद!", pmode: "भुगतान मोड" } : { inv: "Invoice", date: "Date", cust: "Customer", disc: "Discount", cgst: "CGST", sgst: "SGST", pts: "Pts Used", due: "Pending Due", total: "Grand Total", thx: "Thank you for your business!", pmode: "Pay Mode" };
             
             let text = `🧾 *${settings.name}*\n${L.inv}: #${s.id}\n${L.date}: ${s.date}\n${L.cust}: ${s.cust}\n------------------------\n`;
             s.items.forEach(i => { text += `${i.name} (x${i.qty} ${i.unit||'pcs'}) - ₹${i.price * i.qty}\n`; }); text += `------------------------\n`;
             if (s.discount > 0) text += `${L.disc}: -₹${s.discount}\n`;
-            if (s.tax > 0 && settings.gst && settings.gst.trim() !== "") {
+            if (s.tax > 0) {
                 let halfTax = (s.tax / 2).toFixed(2);
-                text += `${L.cgst}: ₹${halfTax}\n${L.sgst}: ₹${halfTax}\n`;
+                let taxModeStr = s.taxMode === 'INCLUSIVE' ? '(Incl.)' : '(Added)';
+                text += `${L.cgst} ${taxModeStr}: ₹${halfTax}\n${L.sgst} ${taxModeStr}: ₹${halfTax}\n`;
             }
             if (s.loyaltyUsed > 0) text += `${L.pts}: -₹${s.loyaltyUsed}\n`;
             if (s.due > 0) text += `${L.due}: ₹${s.due}\n`;
@@ -1281,14 +1474,15 @@
 
         function sendQuoteWhatsApp(id) {
             const q = quotations.find(x => x.id === id); if (!q) return;
-            const L = settings.receiptLanguage === 'HI' ? { inv: "कोटेशन", date: "दिनांक", cust: "ग्राहक", disc: "छूट", cgst: "CGST (शामिल)", sgst: "SGST (शामिल)", total: "कुल अनुमानित राशि", thx: "कोटेशन मान्य 15 दिन" } : { inv: "Quotation", date: "Date", cust: "Customer", disc: "Discount", cgst: "Incl. CGST", sgst: "Incl. SGST", total: "Estimated Total", thx: "Estimate Valid for 15 Days" };
+            const L = settings.receiptLanguage === 'HI' ? { inv: "कोटेशन", date: "दिनांक", cust: "ग्राहक", disc: "छूट", cgst: "CGST", sgst: "SGST", total: "कुल अनुमानित राशि", thx: "कोटेशन मान्य 15 दिन" } : { inv: "Quotation", date: "Date", cust: "Customer", disc: "Discount", cgst: "CGST", sgst: "SGST", total: "Estimated Total", thx: "Estimate Valid for 15 Days" };
             
             let text = `📝 *${settings.name}*\n${L.inv}: #${q.id}\n${L.date}: ${q.date}\n${L.cust}: ${q.cust}\n------------------------\n`;
             q.items.forEach(i => { text += `${i.name} (x${i.qty} ${i.unit||'pcs'}) - ₹${i.price * i.qty}\n`; }); text += `------------------------\n`;
             if (q.discount > 0) text += `${L.disc}: -₹${q.discount}\n`;
-            if (q.tax > 0 && settings.gst && settings.gst.trim() !== "") {
+            if (q.tax > 0) {
                 let halfTax = (q.tax / 2).toFixed(2);
-                text += `${L.cgst}: ₹${halfTax}\n${L.sgst}: ₹${halfTax}\n`;
+                let taxModeStr = q.taxMode === 'INCLUSIVE' ? '(Incl.)' : '(Added)';
+                text += `${L.cgst} ${taxModeStr}: ₹${halfTax}\n${L.sgst} ${taxModeStr}: ₹${halfTax}\n`;
             }
             text += `*${L.total}: ₹${q.total.toFixed(2)}*\n${L.thx}`;
             let phone = (q.phone || "").replace(/\D/g,''); if(phone.length === 10) phone = "91" + phone; 
@@ -1299,10 +1493,11 @@
             const s = sales.find(x => x.id === id);
             let extras = "";
             if (s.discount > 0) extras += `<h4 align="right" style="margin:5px 0; color: #dc3545;">Discount: -₹${s.discount}</h4>`;
-            if (s.tax > 0 && settings.gst && settings.gst.trim() !== "") {
+            if (s.tax > 0) {
                 let halfTax = (s.tax / 2).toFixed(2);
-                extras += `<h4 align="right" style="margin:5px 0; color: #6c757d;">Incl. CGST: ₹${halfTax}</h4>`;
-                extras += `<h4 align="right" style="margin:5px 0; color: #6c757d;">Incl. SGST: ₹${halfTax}</h4>`;
+                let taxModeStr = s.taxMode === 'INCLUSIVE' ? '(Incl.)' : '(Added)';
+                extras += `<h4 align="right" style="margin:5px 0; color: #6c757d;">${taxModeStr} CGST: ₹${halfTax}</h4>`;
+                extras += `<h4 align="right" style="margin:5px 0; color: #6c757d;">${taxModeStr} SGST: ₹${halfTax}</h4>`;
             }
             if (s.loyaltyUsed > 0) extras += `<h4 align="right" style="margin:5px 0; color: #28a745;">Pts Used: -₹${s.loyaltyUsed}</h4>`;
             if (s.due > 0) extras += `<h4 align="right" style="margin:5px 0; color: red;">Due Balance: ₹${s.due}</h4>`;
