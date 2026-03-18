@@ -288,6 +288,8 @@
                         <div class="form-group"><label>City/Branch</label><input type="text" id="set-city"></div>
                         <div class="form-group"><label>Contact Number</label><input type="text" id="set-phone"></div>
                         
+                        <div class="form-group"><label>Shop Email</label><input type="email" id="set-email" placeholder="e.g. contact@myshop.com"></div>
+                        
                         <div class="form-group"><label>UPI ID (For QR Payments)</label><input type="text" id="set-upi-id" placeholder="e.g. 9876543210@ybl"></div>
                         
                         <div class="form-group">
@@ -608,7 +610,7 @@
 
         // DATA STATE
         let appPass = '1234';
-        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '' };
+        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '' };
         let inventory = []; let sales = []; let expenses = []; let customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
         let suppliers = []; let quotations = []; let categories = ["General"]; 
         let cart = []; let custTrigger = "list"; let tempBase64Img = ""; let editingProductId = null;
@@ -640,7 +642,7 @@
 
         // SMART DATA LOADER
         function loadLocalData() {
-            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '' };
+            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '' };
             inventory = []; sales = []; expenses = []; customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
             suppliers = []; quotations = []; categories = ["General"];
             
@@ -807,6 +809,7 @@
             document.getElementById('brand-name').innerText = settings.name; document.getElementById('brand-city').innerText = settings.city;
             document.getElementById('set-name').value = settings.name; document.getElementById('set-city').value = settings.city;
             document.getElementById('set-gst').value = settings.gst || ''; document.getElementById('set-phone').value = settings.phone || ''; document.getElementById('set-address').value = settings.address || '';
+            document.getElementById('set-email').value = settings.email || '';
             document.getElementById('set-staff-pin').value = settings.staffPin || ''; document.getElementById('set-printer').value = settings.printerSize || 'A4'; document.getElementById('set-lang').value = settings.receiptLanguage || 'EN';
             document.getElementById('set-upi-id').value = settings.upiId || '';
             
@@ -1091,7 +1094,7 @@
             }).join('');
             
             document.getElementById('quotationTableBody').innerHTML = quotations.slice().reverse().map(q => {
-                let btns = `<button class="btn btn-green" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="sendQuoteWhatsApp('${q.id}')">📱 WA</button>
+                let btns = `<button class="btn btn-green" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="sendWhatsApp('${q.id}')">📱 Text</button>
                             <button class="btn btn-blue" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="printQuotation('${q.id}')">🖨️ Print</button>
                             <button class="btn btn-gray" style="color:red; padding: 5px 10px; font-size:0.8em;" onclick="deleteItem('quote', '${q.id}')">Del</button>`;
                 return `<tr><td>${q.id}</td><td>${q.date.split(',')[0]}</td><td>${q.cust}</td><td>₹${q.tax||0}</td><td><b>₹${q.total.toFixed(2)}</b></td><td>${btns}</td></tr>`;
@@ -1168,6 +1171,7 @@
             settings.gst = document.getElementById('set-gst').value; 
             settings.phone = document.getElementById('set-phone').value; 
             settings.address = document.getElementById('set-address').value; 
+            settings.email = document.getElementById('set-email').value.trim(); // Save email
             settings.staffPin = document.getElementById('set-staff-pin').value; 
             settings.printerSize = document.getElementById('set-printer').value; 
             settings.receiptLanguage = document.getElementById('set-lang').value; 
@@ -1238,7 +1242,6 @@
         function increaseQty(id) {
             let item = cart.find(c => String(c.id) === String(id));
             if(item) {
-                // If it is a real inventory item, check stock limits
                 let invItem = inventory.find(x => String(x.id) === String(item.id));
                 if (invItem && item.qty + 1 > invItem.stock) {
                     alert(`Not enough stock! Only ${invItem.stock} available.`);
@@ -1319,8 +1322,7 @@
 
             if (settings.upiId && !isQuote && item.due > 0) {
                 let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${item.due.toFixed(2)}&cu=INR`;
-                let qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}&size=300`;
-                text += `🔗 *Pay Pending ₹${item.due.toFixed(2)} via UPI:*\n${settings.upiId}\n\n📷 *Scan QR Code to Pay:*\n${qrUrl}\n\n`;
+                text += `🔗 *Pay Pending ₹${item.due.toFixed(2)} via UPI:*\n${settings.upiId}\n\n`;
             } else if (settings.upiId && !isQuote) {
                 text += `🏦 *UPI ID:* ${settings.upiId}\n\n`;
             }
@@ -1378,7 +1380,7 @@
                 setTimeout(() => {
                     window.print();
                     finishSale();
-                }, 800); 
+                }, 100); 
             } else if (actionType === 'text') {
                 sendWhatsApp(saleId);
                 finishSale();
@@ -1422,7 +1424,7 @@
                 resetCart(); 
                 refreshDisplays(); 
                 alert("Quotation Saved!");
-            }, 800); 
+            }, 100); 
         }
 
         function resetCart() { cart = []; document.getElementById('posDiscount').value = ''; document.getElementById('posTax').value = ''; document.getElementById('posLoyalty').value = ''; document.getElementById('posAdvance').value = ''; document.getElementById('posOrderPhoto').value = ''; document.getElementById('posPayMode').value = 'Cash'; currentOrderPhotoBase64 = ""; updateCart(); }
@@ -1445,6 +1447,7 @@
                 c.due -= (s.due || 0); 
                 c.points = (c.points || 0) + (s.loyaltyUsed || 0) - (s.earnedPoints || 0); 
                 if(c.due < 0) c.due = 0;
+                if(c.points < 0) c.points = 0; 
             }
 
             // Load to POS
@@ -1483,6 +1486,7 @@
                 c.due -= (s.due || 0); 
                 c.points = (c.points || 0) + (s.loyaltyUsed || 0) - (s.earnedPoints || 0); 
                 if(c.due < 0) c.due = 0;
+                if(c.points < 0) c.points = 0; 
             }
 
             s.returned = true;
@@ -1526,17 +1530,21 @@
             if (s.earnedPoints > 0 && !isQuote) extras += `<div style="text-align:center; margin:4px 0; font-size:0.9em;">${L.earned} ${s.earnedPoints}</div>`;
             if (!isQuote && s.payMode) extras += `<div style="text-align:right; margin:4px 0; font-weight:bold; font-size:${fSize};">${L.pmode}: ${s.payMode}</div>`;
 
+            // NEW HEADER SECTION
+            let addressLine = settings.address ? `${settings.address}<br>` : "";
+            let cityLine = settings.city ? `${settings.city}<br>` : "";
             let gstLine = (settings.gst && settings.gst.trim() !== "") ? `${L.gst}: ${settings.gst}<br>` : "";
+            let emailLine = (settings.email && settings.email.trim() !== "") ? `Email: ${settings.email}<br>` : "";
+            let phoneLine = (settings.phone && settings.phone.trim() !== "") ? `Ph: ${settings.phone}` : "";
             
             let qrSection = "";
+            let qrAmount = 0;
             if (settings.upiId && !isQuote) {
-                let qrAmount = (s.due > 0) ? s.due : s.total;
+                qrAmount = (s.due > 0) ? s.due : s.total;
                 if (qrAmount > 0) {
-                    let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${qrAmount.toFixed(2)}&cu=INR`;
-                    let qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}&size=150`;
                     qrSection = `<div style="text-align:center; margin:10px 0; border-top:1px dashed #000; padding-top:10px;">
                         <p style="margin:0 0 5px 0; font-size:${fSize}; font-weight:bold;">Scan to Pay</p>
-                        <img src="${qrUrl}" style="width:100px; height:100px;">
+                        <center><div id="print-qrcode-container"></div></center>
                         <p style="margin:5px 0 0 0; font-size:10px;">UPI: ${settings.upiId}</p>
                     </div>`;
                 }
@@ -1546,7 +1554,7 @@
             <div style="${containerCss} font-family:monospace; color:#000;">
                 <center>
                     <h2 style="margin:5px 0;">${settings.name}</h2>
-                    <div style="font-size:${fSize};">${settings.address}<br>${settings.city}<br>${gstLine}PH: ${settings.phone}</div>
+                    <div style="font-size:${fSize};">${addressLine}${cityLine}${gstLine}${emailLine}${phoneLine}</div>
                     <hr style="border-top:1px dashed #000; margin:5px 0;">
                 </center>
                 <div style="font-size:${fSize}; margin-bottom:5px;">
@@ -1560,6 +1568,16 @@
                 ${qrSection}
                 <center><p style="font-size:${fSize}; margin-top:10px;">${L.thx}</p></center>
             </div>`;
+
+            if (settings.upiId && !isQuote && qrAmount > 0) {
+                let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${qrAmount.toFixed(2)}&cu=INR`;
+                document.getElementById('print-qrcode-container').innerHTML = "";
+                new QRCode(document.getElementById("print-qrcode-container"), {
+                    text: upiString,
+                    width: 100,
+                    height: 100
+                });
+            }
         }
 
         function viewPastBill(id) {
@@ -1579,30 +1597,34 @@
             
             let qrScreen = "";
             if(settings.upiId && s.due > 0) {
-                let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${s.due.toFixed(2)}&cu=INR`;
-                let qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}&size=200`;
                 qrScreen = `<div style="text-align:center; padding:15px; background:#f8fafc; border-radius:8px; margin:15px 0; border:1px solid #cbd5e1;">
                     <p style="margin-top:0; font-weight:bold; color:var(--primary);">Pending Due: ₹${s.due.toFixed(2)}</p>
-                    <img src="${qrUrl}" style="width:150px; height:150px; border-radius:8px; margin-top:10px;">
+                    <center><div id="view-qrcode-container" style="margin-top:10px;"></div></center>
                     <p style="margin-bottom:0; font-size:0.9em; color:#64748b;">Scan to Pay | UPI: ${settings.upiId}</p>
                 </div>`;
             }
 
             document.getElementById('billDetailContent').innerHTML = `<h3>Bill #${s.id}</h3><hr><table style="width:100%">${s.items.map(i => `<tr><td>${i.name} <br><small>${i.brand||''}</small> x${i.qty} ${i.unit||'pcs'}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr>${extras}<h2 align="right">Total: ₹${s.total.toFixed(2)}</h2>${qrScreen}${photoHtml}<br><br>
-                <button class="btn btn-green" style="width:100%; margin-bottom:10px;" onclick="sendWhatsApp('${s.id}')">📱 Send WhatsApp</button>
+                <button class="btn btn-green" style="width:100%; margin-bottom:10px;" onclick="sendWhatsApp('${s.id}')">📱 Send WhatsApp Text</button>
                 <button class="btn btn-blue" style="width:100%; margin-bottom:10px;" onclick="printExistingBill('${s.id}')">🖨️ Re-Print</button>
                 <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Close</button>`;
             document.getElementById('viewBillModal').style.display = 'flex';
+
+            if(settings.upiId && s.due > 0) {
+                 let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${s.due.toFixed(2)}&cu=INR`;
+                 document.getElementById('view-qrcode-container').innerHTML = "";
+                 new QRCode(document.getElementById('view-qrcode-container'), { text: upiString, width: 150, height: 150 });
+            }
         }
         
         function printExistingBill(id) { 
             generateReceiptHTML(sales.find(s=>s.id===id), false); 
-            setTimeout(() => window.print(), 800); 
+            setTimeout(() => window.print(), 100); 
         }
         
         function printQuotation(id) { 
             generateReceiptHTML(quotations.find(q=>q.id===id), true); 
-            setTimeout(() => window.print(), 800); 
+            setTimeout(() => window.print(), 100); 
         }
 
         function openBillPaymentModal(id) { 
