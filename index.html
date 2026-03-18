@@ -288,6 +288,8 @@
                         <div class="form-group"><label>City/Branch</label><input type="text" id="set-city"></div>
                         <div class="form-group"><label>Contact Number</label><input type="text" id="set-phone"></div>
                         
+                        <div class="form-group"><label>UPI ID (For QR Payments)</label><input type="text" id="set-upi-id" placeholder="e.g. 9876543210@ybl"></div>
+                        
                         <div class="form-group">
                             <label>Default Tax Rate (%)</label>
                             <div style="display: flex; gap: 10px;">
@@ -606,7 +608,7 @@
 
         // DATA STATE
         let appPass = '1234';
-        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [] };
+        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '' };
         let inventory = []; let sales = []; let expenses = []; let customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
         let suppliers = []; let quotations = []; let categories = ["General"]; 
         let cart = []; let custTrigger = "list"; let tempBase64Img = ""; let editingProductId = null;
@@ -638,7 +640,7 @@
 
         // SMART DATA LOADER
         function loadLocalData() {
-            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [] };
+            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '' };
             inventory = []; sales = []; expenses = []; customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
             suppliers = []; quotations = []; categories = ["General"];
             
@@ -806,6 +808,7 @@
             document.getElementById('set-name').value = settings.name; document.getElementById('set-city').value = settings.city;
             document.getElementById('set-gst').value = settings.gst || ''; document.getElementById('set-phone').value = settings.phone || ''; document.getElementById('set-address').value = settings.address || '';
             document.getElementById('set-staff-pin').value = settings.staffPin || ''; document.getElementById('set-printer').value = settings.printerSize || 'A4'; document.getElementById('set-lang').value = settings.receiptLanguage || 'EN';
+            document.getElementById('set-upi-id').value = settings.upiId || '';
             
             renderTaxDropdown(); 
 
@@ -837,7 +840,6 @@
             } else { refreshDisplays(); }
         }
 
-        // Builds the dropdown menu dynamically
         function renderTaxDropdown() {
             const dropdown = document.getElementById('tax-dropdown');
             
@@ -856,7 +858,6 @@
             dropdown.innerHTML = html;
         }
 
-        // Shows/Hides the manual input, Save button, and Delete button
         function handleTaxDropdown() {
             const dropdown = document.getElementById('tax-dropdown');
             const manualInput = document.getElementById('set-tax-rate');
@@ -974,7 +975,6 @@
             document.getElementById('today-profit').innerText = "₹" + (daySales - dayExp).toFixed(2);
             document.getElementById('dash-cust-count').innerText = customers.length;
 
-            // --- MONTHLY AND YEARLY REPORT CALCULATION ---
             let currentMonth = new Date().getMonth();
             let currentYear = new Date().getFullYear();
             let monthSales = 0; 
@@ -1001,7 +1001,6 @@
 
             if(userRole === 'admin') updateCharts(); 
 
-            // POS View Render
             const q = document.getElementById('posSearch').value.toLowerCase();
             const catFilter = document.getElementById('posCategoryFilter').value;
             const pGrid = document.getElementById('posProductList'); pGrid.innerHTML = '';
@@ -1012,7 +1011,6 @@
                 }
             });
 
-            // Inventory Table
             document.getElementById('inventoryTableBody').innerHTML = inventory.map(i => {
                 let btns = `<button class="btn btn-gray" style="color:#333; margin-right:5px; padding: 5px 10px; font-size:0.8em;" onclick="printBarcodeLabel(${i.id})">🖨️ Barcode</button>`;
                 if(userRole === 'admin') btns += `<button class="btn btn-gray" style="color:var(--primary); margin-right:5px; padding: 5px 10px; font-size:0.8em;" onclick="editProduct(${i.id})">Edit</button><button class="btn btn-gray" style="color:red; padding: 5px 10px; font-size:0.8em;" onclick="deleteItem('inv', ${i.id})">Del</button>`;
@@ -1027,7 +1025,6 @@
                 </tr>`;
             }).join('');
             
-            // Suppliers Table
             document.getElementById('supplierTableBody').innerHTML = suppliers.map(s => {
                 let bought = s.totalBought || 0;
                 let paid = s.totalPaid || 0;
@@ -1052,10 +1049,8 @@
                 </tr>`;
             }).join('');
 
-            // Expenses
             document.getElementById('expenseTableBody').innerHTML = expenses.slice().reverse().map(e => `<tr><td>${e.date}</td><td><span style="background:#e2e8f0; padding:3px 8px; border-radius:4px; font-size:0.8em;">${e.cat||'Other'}</span></td><td>${e.desc}</td><td>₹${e.amt}</td><td>${userRole==='admin'?`<button class="btn btn-gray" style="color:red;" onclick="deleteItem('exp', ${e.id})">Del</button>`:''}</td></tr>`).join('');
             
-            // Customers Table with Search Filter
             let cSearch = (document.getElementById('searchCustomersTable')?.value || '').toLowerCase();
             let filteredCustomers = customers.filter(c => c.name.toLowerCase().includes(cSearch) || (c.phone && c.phone.includes(cSearch)));
             
@@ -1071,7 +1066,6 @@
                 return `<tr><td><b>${c.name}</b></td><td>${c.phone}</td><td><b style="color:var(--primary)">${c.points||0}</b></td><td>₹${c.spent}</td><td style="color:red; font-weight:bold;">₹${c.due||0}</td><td>${btns}</td></tr>`;
             }).join('');
             
-            // Sales History Table with Search Filter
             let hSearch = (document.getElementById('searchHistory')?.value || '').toLowerCase();
             let filteredSales = sales.filter(s => s.id.toLowerCase().includes(hSearch) || s.cust.toLowerCase().includes(hSearch) || s.date.toLowerCase().includes(hSearch));
 
@@ -1096,9 +1090,8 @@
                 return `<tr style="${s.returned ? 'opacity:0.6;' : ''}"><td>#${s.id}</td><td>${s.date.split(',')[0]}</td><td>${s.cust}</td><td><s style="${s.returned?'':'text-decoration:none;'}">₹${s.total}</s></td><td style="color:red">₹${s.due||0}</td><td>${btns}</td></tr>`;
             }).join('');
             
-            // Quotations Table
             document.getElementById('quotationTableBody').innerHTML = quotations.slice().reverse().map(q => {
-                let btns = `<button class="btn btn-green" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="sendQuoteWhatsApp('${q.id}')">📱 WA</button>
+                let btns = `<button class="btn btn-green" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="sendWhatsApp('${q.id}')">📱 Text</button>
                             <button class="btn btn-blue" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="printQuotation('${q.id}')">🖨️ Print</button>
                             <button class="btn btn-gray" style="color:red; padding: 5px 10px; font-size:0.8em;" onclick="deleteItem('quote', '${q.id}')">Del</button>`;
                 return `<tr><td>${q.id}</td><td>${q.date.split(',')[0]}</td><td>${q.cust}</td><td>₹${q.tax||0}</td><td><b>₹${q.total.toFixed(2)}</b></td><td>${btns}</td></tr>`;
@@ -1180,6 +1173,7 @@
             settings.receiptLanguage = document.getElementById('set-lang').value; 
             settings.taxRate = parseFloat(document.getElementById('set-tax-rate').value) || 0;
             settings.taxMode = document.getElementById('set-tax-mode').value;
+            settings.upiId = document.getElementById('set-upi-id').value.trim(); 
             
             if(tempBase64Img) { 
                 settings.profilePic = tempBase64Img; 
@@ -1218,7 +1212,6 @@
         
         function removeFromCart(id) { cart = cart.filter(c => String(c.id) !== String(id)); updateCart(); }
 
-        // Cart Quantity Increment/Decrement
         function decreaseQty(id) {
             let item = cart.find(c => String(c.id) === String(id));
             if(item) {
@@ -1305,7 +1298,17 @@
             if (!isQuote && item.loyaltyUsed > 0) text += `${L.pts}: -₹${item.loyaltyUsed}\n`;
             if (!isQuote && item.due > 0) text += `${L.due}: ₹${item.due}\n`;
             if (!isQuote && item.payMode) text += `${L.pmode}: ${item.payMode}\n`;
-            text += `*${L.total}: ₹${item.total.toFixed(2)}*\n${L.thx}`;
+            text += `*${L.total}: ₹${item.total.toFixed(2)}*\n\n`;
+
+            if (settings.upiId && !isQuote && item.due > 0) {
+                let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${item.due.toFixed(2)}&cu=INR`;
+                let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiString)}`;
+                text += `🔗 *Pay Pending ₹${item.due.toFixed(2)} via UPI:*\n${settings.upiId}\n\n📷 *Scan QR Code to Pay:*\n${qrUrl}\n\n`;
+            } else if (settings.upiId && !isQuote) {
+                text += `🏦 *UPI ID:* ${settings.upiId}\n\n`;
+            }
+
+            text += `${L.thx}`;
             return text;
         }
 
@@ -1355,8 +1358,10 @@
             generateReceiptHTML(newSale, false); 
             
             if(actionType === 'print') {
-                window.print();
-                finishSale();
+                setTimeout(() => {
+                    window.print();
+                    finishSale();
+                }, 800); // 0.8s delay added here
             } else if (actionType === 'text') {
                 sendWhatsApp(saleId);
                 finishSale();
@@ -1393,8 +1398,14 @@
             const newQuote = { id: 'Q' + Date.now().toString().slice(-5), date: new Date().toLocaleString(), cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxMode: taxMode, discount: discount, items: JSON.parse(JSON.stringify(cart)) };
             quotations.push(newQuote);
             
-            generateReceiptHTML(newQuote, true); window.print();
-            resetCart(); refreshDisplays(); alert("Quotation Saved!");
+            generateReceiptHTML(newQuote, true); 
+            
+            setTimeout(() => {
+                window.print();
+                resetCart(); 
+                refreshDisplays(); 
+                alert("Quotation Saved!");
+            }, 800); // 0.8s delay added here
         }
 
         function resetCart() { cart = []; document.getElementById('posDiscount').value = ''; document.getElementById('posTax').value = ''; document.getElementById('posLoyalty').value = ''; document.getElementById('posAdvance').value = ''; document.getElementById('posOrderPhoto').value = ''; document.getElementById('posPayMode').value = 'Cash'; currentOrderPhotoBase64 = ""; updateCart(); }
@@ -1499,6 +1510,20 @@
             if (!isQuote && s.payMode) extras += `<div style="text-align:right; margin:4px 0; font-weight:bold; font-size:${fSize};">${L.pmode}: ${s.payMode}</div>`;
 
             let gstLine = (settings.gst && settings.gst.trim() !== "") ? `${L.gst}: ${settings.gst}<br>` : "";
+            
+            let qrSection = "";
+            if (settings.upiId && !isQuote) {
+                let qrAmount = (s.due > 0) ? s.due : s.total;
+                if (qrAmount > 0) {
+                    let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${qrAmount.toFixed(2)}&cu=INR`;
+                    let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiString)}`;
+                    qrSection = `<div style="text-align:center; margin:10px 0; border-top:1px dashed #000; padding-top:10px;">
+                        <p style="margin:0 0 5px 0; font-size:${fSize}; font-weight:bold;">Scan to Pay</p>
+                        <img src="${qrUrl}" style="width:100px; height:100px;">
+                        <p style="margin:5px 0 0 0; font-size:10px;">UPI: ${settings.upiId}</p>
+                    </div>`;
+                }
+            }
 
             document.getElementById('receipt-print-area').innerHTML = `
             <div style="${containerCss} font-family:monospace; color:#000;">
@@ -1515,6 +1540,7 @@
                 <hr style="border-top:1px dashed #000; margin:5px 0;">
                 ${extras}
                 <h3 style="text-align:right; border-top:1px solid #000; margin:5px 0; padding-top:5px; font-size:calc(${fSize} + 2px);">${L.total}: ₹${s.total.toFixed(2)}</h3>
+                ${qrSection}
                 <center><p style="font-size:${fSize}; margin-top:10px;">${L.thx}</p></center>
             </div>`;
         }
@@ -1534,13 +1560,34 @@
             if (s.payMode) extras += `<h4 align="right" style="margin:5px 0; color: #17a2b8;">Pay Mode: ${s.payMode}</h4>`;
             let photoHtml = (s.photo && s.photo !== "") ? `<img src="${s.photo}" style="width:100%; border-radius:8px; margin-top:15px; border:1px solid #eee;">` : '';
             
-            document.getElementById('billDetailContent').innerHTML = `<h3>Bill #${s.id}</h3><hr><table style="width:100%">${s.items.map(i => `<tr><td>${i.name} <br><small>${i.brand||''}</small> x${i.qty} ${i.unit||'pcs'}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr>${extras}<h2 align="right">Total: ₹${s.total.toFixed(2)}</h2>${photoHtml}<br><br>
+            let qrScreen = "";
+            if(settings.upiId && s.due > 0) {
+                let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${s.due.toFixed(2)}&cu=INR`;
+                let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+                qrScreen = `<div style="text-align:center; padding:15px; background:#f8fafc; border-radius:8px; margin:15px 0; border:1px solid #cbd5e1;">
+                    <p style="margin-top:0; font-weight:bold; color:var(--primary);">Pending Due: ₹${s.due.toFixed(2)}</p>
+                    <img src="${qrUrl}" style="width:150px; height:150px; border-radius:8px; margin-top:10px;">
+                    <p style="margin-bottom:0; font-size:0.9em; color:#64748b;">Scan to Pay | UPI: ${settings.upiId}</p>
+                </div>`;
+            }
+
+            document.getElementById('billDetailContent').innerHTML = `<h3>Bill #${s.id}</h3><hr><table style="width:100%">${s.items.map(i => `<tr><td>${i.name} <br><small>${i.brand||''}</small> x${i.qty} ${i.unit||'pcs'}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr>${extras}<h2 align="right">Total: ₹${s.total.toFixed(2)}</h2>${qrScreen}${photoHtml}<br><br>
                 <button class="btn btn-green" style="width:100%; margin-bottom:10px;" onclick="sendWhatsApp('${s.id}')">📱 Send WhatsApp</button>
                 <button class="btn btn-blue" style="width:100%; margin-bottom:10px;" onclick="printExistingBill('${s.id}')">🖨️ Re-Print</button>
                 <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Close</button>`;
             document.getElementById('viewBillModal').style.display = 'flex';
         }
         
+        function printExistingBill(id) { 
+            generateReceiptHTML(sales.find(s=>s.id===id), false); 
+            setTimeout(() => window.print(), 800); // 0.8s delay added here
+        }
+        
+        function printQuotation(id) { 
+            generateReceiptHTML(quotations.find(q=>q.id===id), true); 
+            setTimeout(() => window.print(), 800); // 0.8s delay added here
+        }
+
         function openBillPaymentModal(id) { 
             const s = sales.find(x => x.id === id); 
             if (!s) return; 
@@ -1569,7 +1616,6 @@
             refreshDisplays();
         }
 
-        // Customer Specific Payment
         function openCustomerPaymentModal(id) {
             let c = customers.find(x => x.id === id);
             if(!c || !c.due) return;
@@ -1595,9 +1641,6 @@
 
         function openBroadcastModal() { document.getElementById('broadcastMsg').value = ''; document.getElementById('broadcastLinksContainer').innerHTML = ''; document.getElementById('broadcastModal').style.display = 'flex'; }
         function generateBroadcastLinks() { const msg = document.getElementById('broadcastMsg').value; const container = document.getElementById('broadcastLinksContainer'); if(msg.trim() === '') return alert("Please type a message."); let linksHtml = ''; let count = 0; customers.forEach(c => { let phone = (c.phone || "").replace(/\D/g,''); if(phone.length === 10) phone = "91" + phone; if(phone.length >= 10 && c.id !== 1) { linksHtml += `<div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid #eee;"><span>${c.name} <br><small>${c.phone}</small></span><a href="https://wa.me/${phone}?text=${encodeURIComponent(msg)}" target="_blank" class="btn btn-green" style="text-decoration:none; font-size:0.8em; padding:5px 10px;">Send</a></div>`; count++; } }); container.innerHTML = count === 0 ? '<p style="color:red; text-align:center;">No valid phone numbers found.</p>' : `<p style="color:green; font-weight:bold; margin-bottom:10px;">Found ${count} customers.</p>` + linksHtml; }
-        
-        function printExistingBill(id) { generateReceiptHTML(sales.find(s=>s.id===id), false); window.print(); }
-        function printQuotation(id) { generateReceiptHTML(quotations.find(q=>q.id===id), true); window.print(); }
         
         function deleteSale(id) { if(confirm("Delete bill permanently?")) { sales = sales.filter(s => s.id !== id); refreshDisplays(); } }
         function updatePassword() { let p = document.getElementById('new-pass').value; if(p.length < 4) return alert("Too short"); appPass = p; saveToStorage(); alert("Changed!"); }
