@@ -1015,12 +1015,12 @@
                 let btns = `<button class="btn btn-gray" style="color:#333; margin-right:5px; padding: 5px 10px; font-size:0.8em;" onclick="printBarcodeLabel(${i.id})">🖨️ Barcode</button>`;
                 if(userRole === 'admin') btns += `<button class="btn btn-gray" style="color:var(--primary); margin-right:5px; padding: 5px 10px; font-size:0.8em;" onclick="editProduct(${i.id})">Edit</button><button class="btn btn-gray" style="color:red; padding: 5px 10px; font-size:0.8em;" onclick="deleteItem('inv', ${i.id})">Del</button>`;
                 let wBadge = i.warranty ? ` | <span style="color:#007bff;">W: ${i.warranty}</span>` : '';
-                return `<tr class="${i.stock <= 5 ? 'low-stock' : ''}">
+                return `<tr class="${i.stock <= 0 ? 'low-stock' : ''}">
                     <td><b>${i.name}</b><br><small style="color:#666;">${i.brand||'No Brand'}${wBadge}</small></td>
                     <td><span style="font-size:0.8em; background:#f1f5f9; padding:3px 6px; border-radius:4px;">${i.category||'General'}</span></td>
                     <td>${i.supplier||'--'}</td>
                     <td>₹${i.price}/${i.unit||'pc'}</td>
-                    <td><b>${i.stock}</b></td>
+                    <td><b style="${i.stock <= 0 ? 'color:red;' : ''}">${i.stock}</b></td>
                     <td>${btns}</td>
                 </tr>`;
             }).join('');
@@ -1091,7 +1091,7 @@
             }).join('');
             
             document.getElementById('quotationTableBody').innerHTML = quotations.slice().reverse().map(q => {
-                let btns = `<button class="btn btn-green" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="sendWhatsApp('${q.id}')">📱 Text</button>
+                let btns = `<button class="btn btn-green" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="sendQuoteWhatsApp('${q.id}')">📱 WA</button>
                             <button class="btn btn-blue" style="padding: 5px 10px; font-size:0.8em; margin-right: 5px;" onclick="printQuotation('${q.id}')">🖨️ Print</button>
                             <button class="btn btn-gray" style="color:red; padding: 5px 10px; font-size:0.8em;" onclick="deleteItem('quote', '${q.id}')">Del</button>`;
                 return `<tr><td>${q.id}</td><td>${q.date.split(',')[0]}</td><td>${q.cust}</td><td>₹${q.tax||0}</td><td><b>₹${q.total.toFixed(2)}</b></td><td>${btns}</td></tr>`;
@@ -1208,7 +1208,18 @@
             updateCart();
         }
 
-        function addToCart(p) { let ex = cart.find(c => c.id === p.id); if (ex) ex.qty++; else cart.push({ ...p, qty: 1 }); updateCart(); }
+        function addToCart(p) { 
+            let ex = cart.find(c => c.id === p.id); 
+            let currentQty = ex ? ex.qty : 0;
+            
+            if (currentQty + 1 > p.stock) {
+                alert(`Not enough stock! Only ${p.stock} available.`);
+                return;
+            }
+            
+            if (ex) ex.qty++; else cart.push({ ...p, qty: 1 }); 
+            updateCart(); 
+        }
         
         function removeFromCart(id) { cart = cart.filter(c => String(c.id) !== String(id)); updateCart(); }
 
@@ -1227,6 +1238,12 @@
         function increaseQty(id) {
             let item = cart.find(c => String(c.id) === String(id));
             if(item) {
+                // If it is a real inventory item, check stock limits
+                let invItem = inventory.find(x => String(x.id) === String(item.id));
+                if (invItem && item.qty + 1 > invItem.stock) {
+                    alert(`Not enough stock! Only ${invItem.stock} available.`);
+                    return;
+                }
                 item.qty++;
                 updateCart();
             }
@@ -1302,7 +1319,7 @@
 
             if (settings.upiId && !isQuote && item.due > 0) {
                 let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${item.due.toFixed(2)}&cu=INR`;
-                let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiString)}`;
+                let qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}&size=300`;
                 text += `🔗 *Pay Pending ₹${item.due.toFixed(2)} via UPI:*\n${settings.upiId}\n\n📷 *Scan QR Code to Pay:*\n${qrUrl}\n\n`;
             } else if (settings.upiId && !isQuote) {
                 text += `🏦 *UPI ID:* ${settings.upiId}\n\n`;
@@ -1361,7 +1378,7 @@
                 setTimeout(() => {
                     window.print();
                     finishSale();
-                }, 800); // 0.8s delay added here
+                }, 800); 
             } else if (actionType === 'text') {
                 sendWhatsApp(saleId);
                 finishSale();
@@ -1405,7 +1422,7 @@
                 resetCart(); 
                 refreshDisplays(); 
                 alert("Quotation Saved!");
-            }, 800); // 0.8s delay added here
+            }, 800); 
         }
 
         function resetCart() { cart = []; document.getElementById('posDiscount').value = ''; document.getElementById('posTax').value = ''; document.getElementById('posLoyalty').value = ''; document.getElementById('posAdvance').value = ''; document.getElementById('posOrderPhoto').value = ''; document.getElementById('posPayMode').value = 'Cash'; currentOrderPhotoBase64 = ""; updateCart(); }
@@ -1516,7 +1533,7 @@
                 let qrAmount = (s.due > 0) ? s.due : s.total;
                 if (qrAmount > 0) {
                     let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${qrAmount.toFixed(2)}&cu=INR`;
-                    let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(upiString)}`;
+                    let qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}&size=150`;
                     qrSection = `<div style="text-align:center; margin:10px 0; border-top:1px dashed #000; padding-top:10px;">
                         <p style="margin:0 0 5px 0; font-size:${fSize}; font-weight:bold;">Scan to Pay</p>
                         <img src="${qrUrl}" style="width:100px; height:100px;">
@@ -1563,7 +1580,7 @@
             let qrScreen = "";
             if(settings.upiId && s.due > 0) {
                 let upiString = `upi://pay?pa=${settings.upiId}&pn=${encodeURIComponent(settings.name)}&am=${s.due.toFixed(2)}&cu=INR`;
-                let qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiString)}`;
+                let qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiString)}&size=200`;
                 qrScreen = `<div style="text-align:center; padding:15px; background:#f8fafc; border-radius:8px; margin:15px 0; border:1px solid #cbd5e1;">
                     <p style="margin-top:0; font-weight:bold; color:var(--primary);">Pending Due: ₹${s.due.toFixed(2)}</p>
                     <img src="${qrUrl}" style="width:150px; height:150px; border-radius:8px; margin-top:10px;">
@@ -1580,12 +1597,12 @@
         
         function printExistingBill(id) { 
             generateReceiptHTML(sales.find(s=>s.id===id), false); 
-            setTimeout(() => window.print(), 800); // 0.8s delay added here
+            setTimeout(() => window.print(), 800); 
         }
         
         function printQuotation(id) { 
             generateReceiptHTML(quotations.find(q=>q.id===id), true); 
-            setTimeout(() => window.print(), 800); // 0.8s delay added here
+            setTimeout(() => window.print(), 800); 
         }
 
         function openBillPaymentModal(id) { 
