@@ -87,6 +87,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -287,9 +288,7 @@
                         <div class="form-group"><label>GSTIN Number</label><input type="text" id="set-gst"></div>
                         <div class="form-group"><label>City/Branch</label><input type="text" id="set-city"></div>
                         <div class="form-group"><label>Contact Number</label><input type="text" id="set-phone"></div>
-                        
                         <div class="form-group"><label>Shop Email</label><input type="email" id="set-email" placeholder="e.g. contact@myshop.com"></div>
-                        
                         <div class="form-group"><label>UPI ID (For QR Payments)</label><input type="text" id="set-upi-id" placeholder="e.g. 9876543210@ybl"></div>
                         
                         <div class="form-group">
@@ -1171,7 +1170,7 @@
             settings.gst = document.getElementById('set-gst').value; 
             settings.phone = document.getElementById('set-phone').value; 
             settings.address = document.getElementById('set-address').value; 
-            settings.email = document.getElementById('set-email').value.trim(); // Save email
+            settings.email = document.getElementById('set-email').value.trim();
             settings.staffPin = document.getElementById('set-staff-pin').value; 
             settings.printerSize = document.getElementById('set-printer').value; 
             settings.receiptLanguage = document.getElementById('set-lang').value; 
@@ -1530,7 +1529,6 @@
             if (s.earnedPoints > 0 && !isQuote) extras += `<div style="text-align:center; margin:4px 0; font-size:0.9em;">${L.earned} ${s.earnedPoints}</div>`;
             if (!isQuote && s.payMode) extras += `<div style="text-align:right; margin:4px 0; font-weight:bold; font-size:${fSize};">${L.pmode}: ${s.payMode}</div>`;
 
-            // NEW HEADER SECTION
             let addressLine = settings.address ? `${settings.address}<br>` : "";
             let cityLine = settings.city ? `${settings.city}<br>` : "";
             let gstLine = (settings.gst && settings.gst.trim() !== "") ? `${L.gst}: ${settings.gst}<br>` : "";
