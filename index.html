@@ -74,12 +74,35 @@
         .form-group { margin-bottom: 18px; }
         .form-group label { display: block; font-size: 0.85em; font-weight: bold; color: #4a5568; margin-bottom: 8px; }
         .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; outline: none; }
-        #receipt-print-area { display: none; padding: 20px; font-family: 'Courier New', monospace; line-height: 1.4; border: 1px solid #ddd; box-sizing: border-box; background: white; }
+        
+        #receipt-print-area { display: none; }
+        
+        /* THERMAL PRINTER OPTIMIZED CSS */
         @media print {
+            @page { margin: 0; size: auto; } /* REMOVES BROWSER MARGINS */
+            body, html { margin: 0; padding: 0; background: white; }
             body * { visibility: hidden; }
-            #receipt-print-area, #receipt-print-area * { visibility: visible; }
-            #receipt-print-area { display: block !important; position: absolute; left: 0; top: 0; border: none; z-index: 9999; }
+            
+            #receipt-print-area, #receipt-print-area * { 
+                visibility: visible; 
+                color: #000 !important; /* Force true black */
+                font-family: 'Arial', 'Helvetica', sans-serif !important; /* Thicker than monospace */
+                text-rendering: optimizeLegibility;
+            }
+            
+            #receipt-print-area { 
+                display: block !important; 
+                position: absolute; 
+                left: 0; 
+                top: 0; 
+                width: 100%; 
+                border: none; 
+                z-index: 9999; 
+                margin: 0; 
+                padding: 0; 
+            }
         }
+        
         #reader { width: 100%; border-radius: 8px; overflow: hidden; }
         .checkout-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; }
         .search-bar { padding: 10px 15px; border-radius: 8px; border: 1px solid #cbd5e1; outline: none; min-width: 250px; font-size: 0.95em; }
@@ -140,12 +163,17 @@
 
         <div class="main-content">
             <div id="dashboard-view" class="view-section active">
-                <div class="header"><h1>Command Center</h1></div>
+                <div class="header">
+                    <h1>Command Center</h1>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-blue" style="font-size: 1.1em; padding: 10px 20px;" onclick="switchTab('pos')">🛒 New Bill (POS)</button>
+                        <button class="btn btn-warning" style="font-size: 1.1em; padding: 10px 20px;" onclick="openProfitModal()">📊 Daily Profit & Balances</button>
+                    </div>
+                </div>
                 <h3 style="margin-bottom:15px; color:#666;">Today's Snapshot (Daily P/L)</h3>
                 <div class="metrics-grid">
                     <div class="metric-card success"><span>Gross Sales</span><p class="value" id="today-sales">₹0</p></div>
                     <div class="metric-card danger"><span>Expenses</span><p class="value" id="today-expenses">₹0</p></div>
-                    <div class="metric-card"><span>Net Profit</span><p class="value" id="today-profit">₹0</p></div>
                 </div>
                 
                 <h3 style="margin-bottom:15px; color:#666;">Periodic Reports</h3>
@@ -180,7 +208,7 @@
                             <select id="posCategoryFilter" style="padding:10px; border:1px solid #ccc; border-radius:8px;" onchange="refreshDisplays()">
                                 <option value="All">All Categories</option>
                             </select>
-                            <button class="btn btn-dark" onclick="addCustomItem()">🖩 Quick Bill</button>
+                            <button class="btn btn-warning" onclick="openQwikBill()" style="font-weight:bold; font-size: 1.1em;">🖩 QWIK BILL</button>
                             <button class="btn btn-blue" onclick="openCameraScanner()">📷 Scan</button>
                         </div>
                         <div class="products-grid" id="posProductList"></div>
@@ -259,7 +287,7 @@
                     <h3>🔐 System & Printers</h3>
                     <p style="font-size: 0.9em; color: #666; margin-bottom:15px;">Logged in as: <span id="current-user-email" style="font-weight: bold; color: var(--primary);">Local Mode</span></p>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
                         <div class="form-group"><label>Staff PIN (Cashier Mode)</label><input type="text" id="set-staff-pin" placeholder="e.g. 5678"></div>
                         <div class="form-group">
                             <label>Printer Format</label>
@@ -267,6 +295,14 @@
                                 <option value="A4">Standard A4 / PDF</option>
                                 <option value="80mm">3-inch Thermal (80mm)</option>
                                 <option value="58mm">2-inch Thermal (58mm)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Print Connection (How do you print?)</label>
+                            <select id="set-print-method">
+                                <option value="browser">PC USB / Standard Browser Print</option>
+                                <option value="mobile_pdf">Mobile (System Print / Save PDF)</option>
+                                <option value="rawbt">Mobile Bluetooth (Requires RawBT App)</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -335,6 +371,7 @@
                     <h1>Inventory Management</h1>
                     <div style="display: flex; gap: 10px;">
                         <button class="btn btn-warning" onclick="openCategoryModal()">🏷️ Categories</button>
+                        <button class="btn btn-dark" onclick="openCSVModal()">📄 Import CSV</button>
                         <button class="btn btn-blue" onclick="openBulkModal()">🔄 Bulk Update</button>
                         <button class="btn btn-green" onclick="openProductModal()">+ Add Product</button>
                     </div>
@@ -383,6 +420,103 @@
                 </div>
                 <div class="container" style="padding:0;"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Points</th><th>Total Spent</th><th>Due Amt</th><th>Actions</th></tr></thead><tbody id="customerTableBody"></tbody></table></div></div>
             </div>
+        </div>
+    </div>
+
+    <div id="csvModal" class="modal-bg">
+        <div class="modal-box">
+            <h3>Import Inventory (CSV)</h3>
+            <p style="font-size:0.85em; color:#666;">Upload a .csv file to bulk add products. Download the template first to ensure correct column names.</p>
+            <button class="btn btn-warning" style="width:100%; margin-bottom:15px; font-weight:bold;" onclick="downloadCSVTemplate()">⬇️ Download Template</button>
+            <div class="form-group">
+                <label>Select CSV File</label>
+                <input type="file" id="csvFileInput" accept=".csv" style="padding:10px; border:1px dashed #ccc; width:100%; box-sizing:border-box;">
+            </div>
+            <button class="btn btn-blue" style="width:100%; font-size:1.1em; padding:12px;" onclick="processCSVImport()">⬆️ Upload & Import</button><br><br>
+            <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Cancel</button>
+        </div>
+    </div>
+
+    <div id="profitModal" class="modal-bg">
+        <div class="modal-box">
+            <h3 style="margin-top: 0;">📊 Daily Profit & Register</h3>
+            <p style="color:#666; font-size:0.9em; margin-bottom: 20px;">Date: <span id="pm-date"></span></p>
+
+            <div class="form-group">
+                <label>Opening Balance (Drawer Cash ₹)</label>
+                <input type="number" id="pm-opening" placeholder="Enter morning cash..." value="0" oninput="calculateClosingBalance()" style="font-size: 1.2em; text-align: left;">
+            </div>
+
+            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e2e8f0;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span>Gross Sales:</span> <strong style="color:var(--success);" id="pm-sales">₹0</strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                    <span>Total Expenses:</span> <strong style="color:var(--danger);" id="pm-expenses">₹0</strong>
+                </div>
+                <hr style="border-top:1px dashed #ccc; margin:10px 0;">
+                <div style="display:flex; justify-content:space-between; font-size: 1.2em;">
+                    <span>Net Profit:</span> <strong id="pm-net">₹0</strong>
+                </div>
+            </div>
+
+            <div style="background: var(--dark); color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="display:flex; justify-content:space-between; font-size: 1.2em;">
+                    <span>Expected Closing Balance:</span> <strong id="pm-closing">₹0</strong>
+                </div>
+            </div>
+
+            <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Close Window</button>
+        </div>
+    </div>
+
+    <div id="qwikBillModal" class="modal-bg">
+        <div class="modal-box" style="width: 380px; max-width: 95vw; background: #f4f7f9; padding: 25px; border-radius: 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                <h3 style="margin:0; color: #1e293b; font-size: 1.3em;">Fast Entry</h3>
+                <span style="color:#94a3b8; cursor:pointer; font-size:1.8em; line-height:1; font-weight:300;" onclick="closeModals()">✕</span>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px; text-align: right; min-height: 90px; display:flex; flex-direction:column; justify-content:space-between; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);">
+                <div id="qb-expr" style="font-size: 1.2em; color: #64748b; word-wrap: break-word; min-height: 28px; letter-spacing: 1px; padding-bottom: 5px;"></div>
+                <div id="qb-total" style="font-size: 2.8em; font-weight: 700; color: #0f172a; margin-top:5px;">0</div>
+            </div>
+
+            <style>
+                .qb-btn { border: none; border-radius: 10px; font-size: 1.6em; font-weight: 600; cursor: pointer; padding: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: 0.1s; display: flex; align-items: center; justify-content: center; }
+                .qb-btn:active { transform: scale(0.95); }
+                .qb-btn.num { background: white; color: #1e293b; }
+                .qb-btn.op-blue { background: #e0e7ff; color: #4338ca; font-size: 2em; }
+                .qb-btn.op-org { background: #f97316; color: white; font-size: 2em; }
+                .qb-btn.op-grn { background: #22c55e; color: white; font-size: 2em; }
+                .qb-btn.op-red { background: #ef4444; color: white; }
+            </style>
+
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                <button class="qb-btn num" onclick="qbInput('7')">7</button>
+                <button class="qb-btn num" onclick="qbInput('8')">8</button>
+                <button class="qb-btn num" onclick="qbInput('9')">9</button>
+                <button class="qb-btn op-blue" onclick="qbInput('/')">÷</button>
+
+                <button class="qb-btn num" onclick="qbInput('4')">4</button>
+                <button class="qb-btn num" onclick="qbInput('5')">5</button>
+                <button class="qb-btn num" onclick="qbInput('6')">6</button>
+                <button class="qb-btn op-org" onclick="qbInput('*')">×</button>
+
+                <button class="qb-btn num" onclick="qbInput('1')">1</button>
+                <button class="qb-btn num" onclick="qbInput('2')">2</button>
+                <button class="qb-btn num" onclick="qbInput('3')">3</button>
+                <button class="qb-btn op-blue" onclick="qbInput('-')">-</button>
+
+                <button class="qb-btn op-red" onclick="qbBackspace()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+                </button>
+                <button class="qb-btn num" onclick="qbInput('0')">0</button>
+                <button class="qb-btn num" onclick="qbInput('.')">.</button>
+                <button class="qb-btn op-grn" onclick="qbInput('+')">+</button>
+            </div>
+            
+            <button id="qb-add-btn" class="btn" style="width: 100%; margin-top: 20px; padding: 18px; font-size: 1.1em; font-weight:700; background: #007bff; color: white; border-radius: 10px; letter-spacing: 0.5px;" onclick="addQwikBillToCart()">ADD TO CART ➔</button>
         </div>
     </div>
 
@@ -475,7 +609,7 @@
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div class="form-group"><label>Price (₹)</label><input type="number" id="pPrice"></div>
-                <div class="form-group"><label>Stock Qty</label><input type="number" id="pStock"></div>
+                <div class="form-group"><label>Stock Qty</label><input type="number" id="pStock" step="0.01"></div>
             </div>
             <button class="btn btn-blue" style="width:100%" onclick="saveProduct()">Save Product</button><br><br>
             <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Cancel</button>
@@ -609,18 +743,243 @@
 
         // DATA STATE
         let appPass = '1234';
-        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '' };
+        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '', printMethod: 'browser' };
         let inventory = []; let sales = []; let expenses = []; let customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
         let suppliers = []; let quotations = []; let categories = ["General"]; 
         let cart = []; let custTrigger = "list"; let tempBase64Img = ""; let editingProductId = null;
         let editingSaleId = null; let editingSaleDate = null;
         let currentOrderPhotoBase64 = ""; let html5QrcodeScanner = null; let salesChartInstance = null; let pieChartInstance = null;
 
-        // CALCULATOR LOGIC
+        // CSV IMPORT LOGIC
+        function openCSVModal() {
+            document.getElementById('csvModal').style.display = 'flex';
+            document.getElementById('csvFileInput').value = '';
+        }
+
+        function downloadCSVTemplate() {
+            const headers = "Name,Barcode,Category,Supplier,Brand,Unit,Warranty,Price,Stock\n";
+            const sample = "Sample Product,123456789,General,None,Generic,pcs,1 Year,150,50\n";
+            const blob = new Blob([headers + sample], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'LaminationHub_Inventory_Template.csv';
+            a.click();
+        }
+
+        function parseCSVLine(text) {
+            let ret = [], keep = false, value = '';
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                if (c === '"') { keep = !keep; }
+                else if (c === ',' && !keep) { ret.push(value.trim()); value = ''; }
+                else { value += c; }
+            }
+            ret.push(value.trim());
+            return ret.map(v => v.replace(/^"|"$/g, '').trim());
+        }
+
+        function processCSVImport() {
+            const fileInput = document.getElementById('csvFileInput');
+            const file = fileInput.files[0];
+            if (!file) return alert("Please select a CSV file first.");
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+                if (lines.length <= 1) return alert("File is empty or contains no data rows.");
+
+                // Clean headers
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z]/g, ''));
+                
+                const idx = {
+                    name: headers.indexOf('name'),
+                    barcode: headers.indexOf('barcode'),
+                    category: headers.indexOf('category'),
+                    supplier: headers.indexOf('supplier'),
+                    brand: headers.indexOf('brand'),
+                    unit: headers.indexOf('unit'),
+                    warranty: headers.indexOf('warranty'),
+                    price: headers.indexOf('price'),
+                    stock: headers.indexOf('stock')
+                };
+
+                if (idx.name === -1 || idx.price === -1) {
+                    return alert("Error: CSV must contain at least 'Name' and 'Price' columns.");
+                }
+
+                let added = 0;
+                for (let i = 1; i < lines.length; i++) {
+                    let row = parseCSVLine(lines[i]); 
+                    if (row.length < 2) continue;
+
+                    let pName = row[idx.name] || '';
+                    if (!pName) continue;
+
+                    let pBarcode = idx.barcode !== -1 ? row[idx.barcode] : '';
+                    let pCat = idx.category !== -1 ? row[idx.category] : 'General';
+                    let pSup = idx.supplier !== -1 ? row[idx.supplier] : 'None';
+                    let pBrand = idx.brand !== -1 ? row[idx.brand] : '';
+                    let pUnit = idx.unit !== -1 ? row[idx.unit] : 'pcs';
+                    let pWar = idx.warranty !== -1 ? row[idx.warranty] : '';
+                    
+                    let pPrice = idx.price !== -1 ? parseFloat(row[idx.price]) : 0;
+                    let pStock = idx.stock !== -1 ? parseFloat(row[idx.stock]) : 0; // Float allows decimals
+
+                    if(isNaN(pPrice)) pPrice = 0;
+                    if(isNaN(pStock)) pStock = 0;
+
+                    // Skip empty rows completely
+                    if (pName.trim() === '' && pPrice === 0) continue;
+
+                    inventory.push({
+                        id: Date.now() + i, // prevent duplicate IDs in tight loop
+                        name: pName,
+                        barcode: pBarcode,
+                        price: pPrice,
+                        stock: pStock,
+                        category: pCat,
+                        supplier: pSup,
+                        brand: pBrand,
+                        unit: pUnit,
+                        warranty: pWar
+                    });
+                    
+                    // Auto-create category if new
+                    if (pCat && pCat !== 'General' && !categories.includes(pCat)) {
+                        categories.push(pCat);
+                    }
+                    added++;
+                }
+                
+                saveToStorage();
+                refreshDisplays();
+                closeModals();
+                alert(`Success! imported ${added} products into inventory.`);
+            };
+            reader.readAsText(file);
+        }
+
+        // NEW SMART PRINT ROUTER
+        function executePrint() {
+            let method = settings.printMethod || 'browser';
+            if (method === 'rawbt') {
+                let printContent = document.getElementById('receipt-print-area').innerHTML;
+                let htmlToPrint = `<html><head><style>body{margin:0;padding:0;font-family:sans-serif;color:#000;}</style></head><body>${printContent}</body></html>`;
+                let b64 = btoa(unescape(encodeURIComponent(htmlToPrint)));
+                window.location.href = "rawbt:data:text/html;base64," + b64;
+            } else {
+                window.print();
+            }
+        }
+
+        // CALCULATOR LOGIC (Old Widget)
         function toggleCalc() { let c = document.getElementById('calc-container'); c.style.display = c.style.display === 'none' ? 'block' : 'none'; }
         function calcInput(v) { document.getElementById('calc-display').value += v; }
         function calcClear() { document.getElementById('calc-display').value = ''; }
         function calcEval() { try { document.getElementById('calc-display').value = eval(document.getElementById('calc-display').value); } catch(e) { document.getElementById('calc-display').value = 'Error'; } }
+
+        // NEW QWIK BILL LOGIC
+        let qbExpression = "";
+
+        function openQwikBill() {
+            qbExpression = "";
+            updateQwikBillDisplay();
+            document.getElementById('qwikBillModal').style.display = 'flex';
+        }
+
+        function qbInput(char) {
+            const operators = ['+', '-', '*', '/'];
+            if (qbExpression === "" && operators.includes(char)) return; 
+            
+            let lastChar = qbExpression.slice(-1);
+            if (operators.includes(char) && operators.includes(lastChar)) {
+                qbExpression = qbExpression.slice(0, -1) + char; 
+            } else {
+                qbExpression += char;
+            }
+            updateQwikBillDisplay();
+        }
+
+        function qbBackspace() {
+            qbExpression = qbExpression.slice(0, -1);
+            updateQwikBillDisplay();
+        }
+
+        function qbClear() {
+            qbExpression = "";
+            updateQwikBillDisplay();
+        }
+
+        function updateQwikBillDisplay() {
+            let displayStr = qbExpression.replace(/\*/g, ' × ').replace(/\//g, ' ÷ ').replace(/\+/g, ' + ').replace(/\-/g, ' - ');
+            document.getElementById('qb-expr').innerText = displayStr;
+            
+            let total = 0;
+            try {
+                if (qbExpression) {
+                    let evalExpr = qbExpression;
+                    const operators = ['+', '-', '*', '/'];
+                    if (operators.includes(evalExpr.slice(-1))) {
+                        evalExpr = evalExpr.slice(0, -1);
+                    }
+                    total = eval(evalExpr) || 0;
+                }
+            } catch(e) {
+                total = 0;
+            }
+            
+            total = Math.round(total * 100) / 100;
+            document.getElementById('qb-total').innerText = total;
+            document.getElementById('qb-add-btn').innerHTML = `ADD TO CART (₹ ${total}) ➔`;
+        }
+
+        function addQwikBillToCart() {
+            if (!qbExpression) return;
+            let evalExpr = qbExpression;
+            const operators = ['+', '-', '*', '/'];
+            if (operators.includes(evalExpr.slice(-1))) {
+                evalExpr = evalExpr.slice(0, -1);
+            }
+
+            try {
+                // Split by '+' to separate multiple distinct items
+                let parts = evalExpr.split('+');
+                let offset = cart.filter(c => c.name.startsWith("Qwik Item")).length;
+                
+                parts.forEach((part, index) => {
+                    let rate = 0;
+                    let qty = 1;
+                    
+                    // If there's a multiplication, parse it as Rate * Quantity
+                    if (part.includes('*')) {
+                        let subParts = part.split('*');
+                        if (subParts.length === 2) {
+                            rate = eval(subParts[0]);
+                            qty = eval(subParts[1]);
+                        } else {
+                            rate = eval(part);
+                            qty = 1;
+                        }
+                    } else {
+                        // Standard flat amount
+                        rate = eval(part);
+                        qty = 1;
+                    }
+
+                    if (rate && rate > 0 && qty && qty > 0) {
+                        rate = Math.round(rate * 100) / 100;
+                        qty = Math.round(qty * 100) / 100; // Allow decimal quantities too!
+                        let desc = `Qwik Item ${offset + index + 1}`;
+                        cart.push({id: 'qwik_'+Date.now()+'_'+index, name: desc, price: rate, qty: qty, unit: 'pcs', brand: ''});
+                    }
+                });
+                updateCart();
+                closeModals();
+            } catch (e) {
+                alert("Invalid calculation!");
+            }
+        }
 
         // COMPRESS PHOTO
         document.getElementById('posOrderPhoto').addEventListener('change', function(e) {
@@ -641,7 +1000,7 @@
 
         // SMART DATA LOADER
         function loadLocalData() {
-            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '' };
+            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '', printMethod: 'browser' };
             inventory = []; sales = []; expenses = []; customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
             suppliers = []; quotations = []; categories = ["General"];
             
@@ -812,6 +1171,9 @@
             document.getElementById('set-staff-pin').value = settings.staffPin || ''; document.getElementById('set-printer').value = settings.printerSize || 'A4'; document.getElementById('set-lang').value = settings.receiptLanguage || 'EN';
             document.getElementById('set-upi-id').value = settings.upiId || '';
             
+            // Set Print Method
+            document.getElementById('set-print-method').value = settings.printMethod || 'browser';
+            
             renderTaxDropdown(); 
 
             document.getElementById('set-tax-rate').value = settings.taxRate || 0;
@@ -971,10 +1333,17 @@
             let daySales = daySalesItems.reduce((a, b) => a + (b.total || 0), 0);
             let dayExp = expenses.filter(e => e.date === today).reduce((a, b) => a + (b.amt || 0), 0);
 
+            // Store for global modal access
+            window.currentDaySales = daySales;
+            window.currentDayExp = dayExp;
+
             document.getElementById('dash-sales').innerText = "₹" + lifeSales.toFixed(2); 
             document.getElementById('today-sales').innerText = "₹" + daySales.toFixed(2);
             document.getElementById('today-expenses').innerText = "₹" + dayExp.toFixed(2); 
-            document.getElementById('today-profit').innerText = "₹" + (daySales - dayExp).toFixed(2);
+            
+            let profitCard = document.getElementById('today-profit');
+            if(profitCard) profitCard.innerText = "₹" + (daySales - dayExp).toFixed(2);
+            
             document.getElementById('dash-cust-count').innerText = customers.length;
 
             let currentMonth = new Date().getMonth();
@@ -1143,7 +1512,7 @@
             const name = document.getElementById('pName').value; 
             const barcode = document.getElementById('pBarcode').value; 
             const price = parseFloat(document.getElementById('pPrice').value); 
-            const stock = parseInt(document.getElementById('pStock').value); 
+            const stock = parseFloat(document.getElementById('pStock').value) || 0; 
             const category = document.getElementById('pCat').value; 
             const supplier = document.getElementById('pSupplier').value; 
             const brand = document.getElementById('pBrand').value;
@@ -1159,10 +1528,10 @@
             closeModals(); refreshDisplays(); 
         }
         
-        function openBulkModal() { document.getElementById('bulkItemsContainer').innerHTML = inventory.map(i => `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f8fafc;"><span style="font-size: 0.9em; flex: 1;">${i.name} <br><small style="color:#999;">Stock: ${i.stock}</small></span><input type="number" class="bulk-qty-input" data-id="${i.id}" placeholder="+0" style="width: 80px; padding: 5px;"></div>`).join(''); document.getElementById('bulkModal').style.display = 'flex'; }
-        function saveBulkStock() { let changed = false; document.querySelectorAll('.bulk-qty-input').forEach(input => { const addQty = parseInt(input.value); if (!isNaN(addQty) && addQty !== 0) { const p = inventory.find(x => x.id == input.getAttribute('data-id')); if (p) { p.stock += addQty; changed = true; } } }); if (changed) { alert("Stock updated!"); refreshDisplays(); } closeModals(); }
+        function openBulkModal() { document.getElementById('bulkItemsContainer').innerHTML = inventory.map(i => `<div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #f8fafc;"><span style="font-size: 0.9em; flex: 1;">${i.name} <br><small style="color:#999;">Stock: ${i.stock}</small></span><input type="number" step="0.01" class="bulk-qty-input" data-id="${i.id}" placeholder="+0" style="width: 80px; padding: 5px;"></div>`).join(''); document.getElementById('bulkModal').style.display = 'flex'; }
+        function saveBulkStock() { let changed = false; document.querySelectorAll('.bulk-qty-input').forEach(input => { const addQty = parseFloat(input.value); if (!isNaN(addQty) && addQty !== 0) { const p = inventory.find(x => x.id == input.getAttribute('data-id')); if (p) { p.stock += addQty; changed = true; } } }); if (changed) { alert("Stock updated!"); refreshDisplays(); } closeModals(); }
         
-        function closeModals() { editingProductId = null; let pTitle = document.querySelector('#productModal h3'); if (pTitle) pTitle.innerText = "Product Info"; closeScanner(); document.querySelectorAll('.modal-bg').forEach(m => m.style.display='none'); document.querySelectorAll('input:not(#posSearch):not(#passInput):not(.search-bar):not([name="supType"])').forEach(i => i.value=''); }
+        function closeModals() { editingProductId = null; let pTitle = document.querySelector('#productModal h3'); if (pTitle) pTitle.innerText = "Product Info"; closeScanner(); document.querySelectorAll('.modal-bg').forEach(m => m.style.display='none'); document.querySelectorAll('input:not(#posSearch):not(#passInput):not(.search-bar):not([name="supType"]):not(#csvFileInput)').forEach(i => i.value=''); }
         
         function saveShopSettings() { 
             settings.name = document.getElementById('set-name').value; 
@@ -1177,6 +1546,7 @@
             settings.taxRate = parseFloat(document.getElementById('set-tax-rate').value) || 0;
             settings.taxMode = document.getElementById('set-tax-mode').value;
             settings.upiId = document.getElementById('set-upi-id').value.trim(); 
+            settings.printMethod = document.getElementById('set-print-method').value;
             
             if(tempBase64Img) { 
                 settings.profilePic = tempBase64Img; 
@@ -1187,30 +1557,6 @@
         }
 
         // --- POS, TAX, QUOTE AND LOYALTY LOGIC ---
-        function addCustomItem() {
-            let input = prompt("Enter Amount OR use '+' to auto-add multiple items (e.g. 200+200+600+400):", "");
-            if(!input) return;
-            
-            if(input.includes('+')) {
-                let amounts = input.split('+').map(a => parseFloat(a.trim())).filter(a => !isNaN(a) && a > 0);
-                if(amounts.length === 0) return;
-                
-                let offset = cart.filter(c => c.name.startsWith("Product ")).length;
-                
-                amounts.forEach((amt, index) => {
-                    let desc = `Product ${offset + index + 1}`;
-                    cart.push({id: 'custom_'+Date.now()+'_'+index, name: desc, price: amt, qty: 1, unit: 'item', brand: ''});
-                });
-            } else {
-                let amt = parseFloat(input);
-                if(isNaN(amt) || amt <= 0) return;
-                let desc = prompt("Enter Description (optional):", "Custom Item") || "Custom Item";
-                let ex = cart.find(c => c.name === desc && c.price === amt && String(c.id).startsWith('custom_'));
-                if(ex) { ex.qty++; } else { cart.push({id: 'custom_'+Date.now(), name: desc, price: amt, qty: 1, unit: 'item', brand: ''}); }
-            }
-            updateCart();
-        }
-
         function addToCart(p) { 
             let ex = cart.find(c => c.id === p.id); 
             let currentQty = ex ? ex.qty : 0;
@@ -1251,6 +1597,22 @@
             }
         }
 
+        function updateItemQty(id, newQty) {
+            let item = cart.find(c => String(c.id) === String(id));
+            if(item) {
+                let parsedQty = parseFloat(newQty);
+                if(isNaN(parsedQty) || parsedQty <= 0) parsedQty = 1;
+                let invItem = inventory.find(x => String(x.id) === String(item.id));
+                if (invItem && parsedQty > invItem.stock) {
+                    alert(`Not enough stock! Only ${invItem.stock} available.`);
+                    item.qty = invItem.stock;
+                } else {
+                    item.qty = parsedQty;
+                }
+                updateCart();
+            }
+        }
+
         function updateCart() {
             let cid = document.getElementById('posCustomerSelect').value; let c = customers.find(x => x.id == cid);
             document.getElementById('availPoints').innerText = c ? (c.points || 0) : 0;
@@ -1259,18 +1621,27 @@
             
             document.getElementById('cartBody').innerHTML = cart.map(i => { 
                 subtotal += i.price*i.qty; 
+                
+                let qtyControl = '';
+                let decimalUnits = ['kg', 'mtr', 'sqft'];
+                if (decimalUnits.includes(i.unit)) {
+                    qtyControl = `<input type="number" step="0.01" min="0.01" value="${i.qty}" onchange="updateItemQty('${i.id}', this.value)" style="width:60px; height:24px; padding:0 4px; border:1px solid #cbd5e1; border-radius:4px; text-align:center; font-size:0.9em; font-weight:bold; outline:none; box-sizing:border-box;">`;
+                } else {
+                    qtyControl = `<button onclick="decreaseQty('${i.id}')" style="width:24px; height:24px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; padding:0;">-</button>
+                    <span style="font-size:0.9em; font-weight:bold; min-width:15px; text-align:center;">${i.qty}</span>
+                    <button onclick="increaseQty('${i.id}')" style="width:24px; height:24px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; padding:0;">+</button>`;
+                }
+
                 return `<tr>
                     <td style="color:#dc3545; cursor:pointer; font-weight:bold; padding-right:10px; font-size:1.1em; vertical-align:middle;" onclick="removeFromCart('${i.id}')">✕</td>
                     <td style="width:100%; vertical-align:middle;">
                         ${i.name} <br><small>${i.brand||''}</small>
                         <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-                            <button onclick="decreaseQty('${i.id}')" style="width:24px; height:24px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; padding:0;">-</button>
-                            <span style="font-size:0.9em; font-weight:bold; min-width:15px; text-align:center;">${i.qty}</span>
-                            <button onclick="increaseQty('${i.id}')" style="width:24px; height:24px; border:1px solid #cbd5e1; background:#f8fafc; border-radius:4px; cursor:pointer; font-weight:bold; padding:0;">+</button>
+                            ${qtyControl}
                             <small style="color:#64748b; margin-left:5px;">${i.unit||'pcs'}</small>
                         </div>
                     </td>
-                    <td align="right" style="vertical-align:middle; font-weight:bold;">₹${i.price*i.qty}</td>
+                    <td align="right" style="vertical-align:middle; font-weight:bold;">₹${(i.price*i.qty).toFixed(2)}</td>
                 </tr>`; 
             }).join('');
             
@@ -1377,7 +1748,7 @@
             
             if(actionType === 'print') {
                 setTimeout(() => {
-                    window.print();
+                    executePrint();
                     finishSale();
                 }, 100); 
             } else if (actionType === 'text') {
@@ -1419,7 +1790,7 @@
             generateReceiptHTML(newQuote, true); 
             
             setTimeout(() => {
-                window.print();
+                executePrint();
                 resetCart(); 
                 refreshDisplays(); 
                 alert("Quotation Saved!");
@@ -1504,15 +1875,15 @@
                 total: "Total", thx: isQuote ? "*** Estimate Valid for 15 Days ***" : "*** Thank You! ***", earned: "⭐ You earned Points:", gst: "GSTIN", pmode: "Pay Mode"
             };
 
-            let pWidth = "100%"; let fSize = "14px"; let containerCss = "box-sizing:border-box;";
-            if(settings.printerSize === '58mm') { pWidth = "58mm"; fSize = "11px"; containerCss="width:58mm; margin:0 auto; padding:0;"; }
-            if(settings.printerSize === '80mm') { pWidth = "80mm"; fSize = "12px"; containerCss="width:80mm; margin:0 auto; padding:0;"; }
+            let pWidth = "100%"; let fSize = "15px"; let containerCss = "box-sizing:border-box; width:100%; padding:10px;";
+            if(settings.printerSize === '58mm') { pWidth = "58mm"; fSize = "13px"; containerCss="width:58mm; margin:0 auto; padding:5px; font-weight:bold;"; }
+            if(settings.printerSize === '80mm') { pWidth = "80mm"; fSize = "15px"; containerCss="width:80mm; margin:0 auto; padding:5px; font-weight:bold;"; }
 
-            let tableHTML = `<table style="width:100%; border-top:1px dashed #000; font-size:${fSize}; text-align:left; border-collapse:collapse;">`;
+            let tableHTML = `<table style="width:100%; border-top:1px solid #000; font-size:${fSize}; text-align:left; border-collapse:collapse;">`;
             s.items.forEach(i => { 
                 let bStr = i.brand ? ` (${i.brand})` : '';
                 let wStr = i.warranty ? `<br><small>W: ${i.warranty}</small>` : '';
-                tableHTML += `<tr><td style="padding:4px 0; border:none;">${i.name}${bStr} ${wStr}<br><small>x${i.qty} ${i.unit||'pcs'} @ ₹${i.price}</small></td><td align="right" style="padding:4px 0; border:none; vertical-align:bottom;">₹${i.price*i.qty}</td></tr>`; 
+                tableHTML += `<tr><td style="padding:6px 0; border:none;">${i.name}${bStr} ${wStr}<br><span style="font-size:0.9em;">x${i.qty} ${i.unit||'pcs'} @ ₹${i.price}</span></td><td align="right" style="padding:6px 0; border:none; vertical-align:bottom;">₹${i.price*i.qty}</td></tr>`; 
             });
             tableHTML += `</table>`;
 
@@ -1549,22 +1920,22 @@
             }
 
             document.getElementById('receipt-print-area').innerHTML = `
-            <div style="${containerCss} font-family:monospace; color:#000;">
+            <div style="${containerCss}">
                 <center>
-                    <h2 style="margin:5px 0;">${settings.name}</h2>
+                    <h2 style="margin:5px 0; font-size:calc(${fSize} + 6px);">${settings.name}</h2>
                     <div style="font-size:${fSize};">${addressLine}${cityLine}${gstLine}${emailLine}${phoneLine}</div>
-                    <hr style="border-top:1px dashed #000; margin:5px 0;">
+                    <hr style="border-top:1px dashed #000; margin:8px 0;">
                 </center>
-                <div style="font-size:${fSize}; margin-bottom:5px;">
+                <div style="font-size:${fSize}; margin-bottom:8px;">
                     ${L.inv} #${s.id} | ${s.date}<br>
                     ${L.cust}: ${s.cust}
                 </div>
                 ${tableHTML}
-                <hr style="border-top:1px dashed #000; margin:5px 0;">
+                <hr style="border-top:1px dashed #000; margin:8px 0;">
                 ${extras}
-                <h3 style="text-align:right; border-top:1px solid #000; margin:5px 0; padding-top:5px; font-size:calc(${fSize} + 2px);">${L.total}: ₹${s.total.toFixed(2)}</h3>
+                <h3 style="text-align:right; border-top:1px solid #000; margin:5px 0; padding-top:5px; font-size:calc(${fSize} + 4px);">${L.total}: ₹${s.total.toFixed(2)}</h3>
                 ${qrSection}
-                <center><p style="font-size:${fSize}; margin-top:10px;">${L.thx}</p></center>
+                <center><p style="font-size:${fSize}; margin-top:15px;">${L.thx}</p></center>
             </div>`;
 
             if (settings.upiId && !isQuote && qrAmount > 0) {
@@ -1617,12 +1988,12 @@
         
         function printExistingBill(id) { 
             generateReceiptHTML(sales.find(s=>s.id===id), false); 
-            setTimeout(() => window.print(), 100); 
+            setTimeout(() => executePrint(), 100); 
         }
         
         function printQuotation(id) { 
             generateReceiptHTML(quotations.find(q=>q.id===id), true); 
-            setTimeout(() => window.print(), 100); 
+            setTimeout(() => executePrint(), 100); 
         }
 
         function openBillPaymentModal(id) { 
@@ -1763,6 +2134,34 @@
 
             w.document.write(`<html><head><title>Print Barcodes</title><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"><\/script><style>body{text-align:center;font-family:sans-serif;margin:0;padding:10mm; display:flex; flex-wrap:wrap; justify-content:flex-start; gap:10px;}.label{width: 4cm; height: 3cm; border: 1px dashed #ccc; padding: 5px; box-sizing: border-box; display:flex; flex-direction:column; justify-content:center; align-items:center; page-break-inside:avoid;}h3{margin:0 0 3px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}p{margin:0 0 2px;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}.price{font-size:14px;font-weight:bold;margin:2px 0 0 0;}@media print{@page{margin:0;}body{margin:0.5cm;}}</style></head><body>${labelsHtml}<script>${scriptsHtml} window.onload=function(){setTimeout(()=>{window.print();window.close();},500)};<\/script></body></html>`); 
             w.document.close(); 
+        }
+
+        // --- PROFIT MODAL LOGIC ---
+        function openProfitModal() {
+            document.getElementById('pm-date').innerText = new Date().toLocaleDateString();
+            document.getElementById('pm-sales').innerText = "₹" + (window.currentDaySales || 0).toFixed(2);
+            document.getElementById('pm-expenses').innerText = "₹" + (window.currentDayExp || 0).toFixed(2);
+            let net = (window.currentDaySales || 0) - (window.currentDayExp || 0);
+            let netEl = document.getElementById('pm-net');
+            netEl.innerText = "₹" + net.toFixed(2);
+            netEl.style.color = net >= 0 ? "var(--success)" : "var(--danger)";
+
+            let todayStr = new Date().toLocaleDateString();
+            let savedOpening = localStorage.getItem('lh_opening_' + todayStr) || 0;
+            document.getElementById('pm-opening').value = savedOpening;
+
+            calculateClosingBalance();
+            document.getElementById('profitModal').style.display = 'flex';
+        }
+
+        function calculateClosingBalance() {
+            let opening = parseFloat(document.getElementById('pm-opening').value) || 0;
+            let todayStr = new Date().toLocaleDateString();
+            localStorage.setItem('lh_opening_' + todayStr, opening);
+
+            let net = (window.currentDaySales || 0) - (window.currentDayExp || 0);
+            let closing = opening + net;
+            document.getElementById('pm-closing').innerText = "₹" + closing.toFixed(2);
         }
     </script>
 </body>
