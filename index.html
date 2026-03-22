@@ -229,14 +229,14 @@
                                 <button class="btn btn-green" onclick="openCustomerModal('pos')">+</button>
                             </div>
                         </div>
-                        
-                        <div style="margin-bottom: 15px;">
-                            <label style="font-size: 0.8em; font-weight: bold; color: #64748b;">ATTACH DESIGN/PHOTO (Optional)</label>
-                            <input type="file" id="posOrderPhoto" accept="image/*" style="font-size: 0.85em; margin-top:5px; width:100%;">
-                        </div>
 
                         <table style="margin-bottom: 10px; width: 100%;"><tbody id="cartBody"></tbody></table>
                         
+                        <div class="checkout-row">
+                            <span style="font-weight: bold; color: #64748b; font-size: 0.9em;">SHIPPING (₹)</span>
+                            <input type="number" id="posShipping" placeholder="0" style="width: 100px; padding: 8px; text-align: right; border: 1px solid #cbd5e1; border-radius: 5px;" oninput="updateCart()" min="0">
+                        </div>
+
                         <div class="checkout-row">
                             <span style="font-weight: bold; color: #64748b; font-size: 0.9em;">TAX (%)</span>
                             <input type="number" id="posTax" placeholder="Auto" style="width: 100px; padding: 8px; text-align: right; border: 1px solid #cbd5e1; border-radius: 5px;" oninput="updateCart()" min="0">
@@ -516,7 +516,7 @@
                     </div>
                     <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
                         <span style="color:#666; font-weight: 600;">Total sell shipping charge:</span>
-                        <span style="color:#333;">₹ 0.00</span>
+                        <span id="pm-sell-shipping" style="color:#333;">₹ 0.00</span>
                     </div>
                     <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
                         <span style="color:#666; font-weight: 600;">Sell additional expenses:</span>
@@ -847,7 +847,7 @@
         let suppliers = []; let quotations = []; let categories = ["General"]; 
         let cart = []; let custTrigger = "list"; let tempBase64Img = ""; let editingProductId = null;
         let editingSaleId = null; let editingSaleDate = null;
-        let currentOrderPhotoBase64 = ""; let html5QrcodeScanner = null; let salesChartInstance = null; let pieChartInstance = null;
+        let html5QrcodeScanner = null; let salesChartInstance = null; let pieChartInstance = null;
 
         // LIVE DATE AND TIME CLOCK
         function updateClock() {
@@ -1058,6 +1058,7 @@
             }
 
             try {
+                // Split by '+' to separate multiple distinct items
                 let parts = evalExpr.split('+');
                 let offset = cart.filter(c => c.name.startsWith("Quick Item")).length;
                 
@@ -1068,6 +1069,7 @@
                     let rate = 0;
                     let qty = 1;
                     
+                    // If there's a multiplication, parse it as Rate * Quantity
                     if (safePart.includes('*')) {
                         let subParts = safePart.split('*');
                         if (subParts.length === 2 && !safePart.includes('(')) {
@@ -1095,23 +1097,6 @@
                 alert("Invalid calculation!");
             }
         }
-
-        // COMPRESS PHOTO
-        document.getElementById('posOrderPhoto').addEventListener('change', function(e) {
-            const file = e.target.files[0]; if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 500; canvas.width = MAX_WIDTH; canvas.height = img.height * (MAX_WIDTH / img.width);
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    currentOrderPhotoBase64 = canvas.toDataURL('image/jpeg', 0.7);
-                }
-                img.src = event.target.result;
-            }
-            reader.readAsDataURL(file);
-        });
 
         // SMART DATA LOADER
         function loadLocalData() {
@@ -1774,16 +1759,17 @@
             let taxMode = settings.taxMode || 'EXCLUSIVE';
             
             let taxAmount = 0;
-            let grandTotal = 0;
             
+            let shippingInput = parseFloat(document.getElementById('posShipping').value) || 0;
+
             if(taxMode === 'INCLUSIVE') {
                 let baseAmount = taxableAmount / (1 + (taxPercent / 100));
                 taxAmount = taxableAmount - baseAmount;
-                grandTotal = taxableAmount - loyaltyUsed;
             } else {
                 taxAmount = taxableAmount * (taxPercent / 100);
-                grandTotal = taxableAmount + taxAmount - loyaltyUsed;
             }
+
+            let grandTotal = taxableAmount + taxAmount + shippingInput - loyaltyUsed;
 
             if(grandTotal < 0) grandTotal = 0; 
             document.getElementById('grandTotal').innerText = "₹" + grandTotal.toFixed(2);
@@ -1799,6 +1785,8 @@
             let text = `🧾 *${settings.name}*\n${L.inv}: #${item.id}\n${L.date}: ${item.date}\n${L.cust}: ${item.cust}\n------------------------\n`;
             item.items.forEach(i => { text += `${i.name} (x${i.qty} ${i.unit||'pcs'}) - ₹${i.price * i.qty}\n`; }); text += `------------------------\n`;
             
+            if (item.shipping > 0) text += `Shipping: ₹${item.shipping.toFixed(2)}\n`;
+
             if (item.discount > 0) {
                 let discLabel = item.discountStr ? ` (${item.discountStr})` : '';
                 text += `${L.disc}${discLabel}: -₹${item.discount.toFixed(2)}\n`;
@@ -1852,6 +1840,8 @@
             let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : (settings.taxRate || 0);
             let taxMode = settings.taxMode || 'EXCLUSIVE';
             
+            let shippingInput = parseFloat(document.getElementById('posShipping').value) || 0;
+
             let taxAmount = 0;
             if(taxMode === 'INCLUSIVE') {
                 let baseAmount = taxableAmount / (1 + (taxPercent / 100));
@@ -1867,7 +1857,7 @@
             let saleId = editingSaleId ? editingSaleId : Date.now().toString().slice(-6);
             let saleDate = editingSaleDate ? editingSaleDate : new Date().toLocaleString();
 
-            const newSale = { id: saleId, date: saleDate, cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxPercent: taxPercent, taxMode: taxMode, due: due, discount: discountAmount, discountStr: discountStr, loyaltyUsed: loyaltyUsed, earnedPoints: earnedPoints, photo: currentOrderPhotoBase64, payMode: payMode, items: JSON.parse(JSON.stringify(cart)), returned: false };
+            const newSale = { id: saleId, date: saleDate, cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxPercent: taxPercent, taxMode: taxMode, due: due, discount: discountAmount, discountStr: discountStr, loyaltyUsed: loyaltyUsed, earnedPoints: earnedPoints, shipping: shippingInput, payMode: payMode, items: JSON.parse(JSON.stringify(cart)), returned: false };
             sales.push(newSale); 
             
             if(c) { c.spent += total; c.due = (c.due || 0) + due; c.points = (c.points || 0) - loyaltyUsed + earnedPoints; }
@@ -1908,6 +1898,8 @@
             let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : (settings.taxRate || 0);
             let taxMode = settings.taxMode || 'EXCLUSIVE';
             
+            let shippingInput = parseFloat(document.getElementById('posShipping').value) || 0;
+
             let taxAmount = 0;
             if(taxMode === 'INCLUSIVE') {
                 let baseAmount = taxableAmount / (1 + (taxPercent / 100));
@@ -1918,7 +1910,7 @@
 
             let cid = document.getElementById('posCustomerSelect').value; let c = customers.find(x => x.id == cid);
 
-            const newQuote = { id: 'Q' + Date.now().toString().slice(-5), date: new Date().toLocaleString(), cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxMode: taxMode, discount: discountAmount, discountStr: discountStr, items: JSON.parse(JSON.stringify(cart)) };
+            const newQuote = { id: 'Q' + Date.now().toString().slice(-5), date: new Date().toLocaleString(), cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxMode: taxMode, discount: discountAmount, discountStr: discountStr, shipping: shippingInput, items: JSON.parse(JSON.stringify(cart)) };
             quotations.push(newQuote);
             
             generateReceiptHTML(newQuote, true); 
@@ -1931,7 +1923,7 @@
             }, 100); 
         }
 
-        function resetCart() { cart = []; document.getElementById('posDiscount').value = ''; document.getElementById('posDiscountType').value = 'flat'; document.getElementById('posTax').value = ''; document.getElementById('posLoyalty').value = ''; document.getElementById('posAdvance').value = ''; document.getElementById('posOrderPhoto').value = ''; document.getElementById('posPayMode').value = 'Cash'; currentOrderPhotoBase64 = ""; updateCart(); }
+        function resetCart() { cart = []; document.getElementById('posDiscount').value = ''; document.getElementById('posDiscountType').value = 'flat'; document.getElementById('posTax').value = ''; document.getElementById('posLoyalty').value = ''; document.getElementById('posAdvance').value = ''; document.getElementById('posShipping').value = ''; document.getElementById('posPayMode').value = 'Cash'; updateCart(); }
 
         // --- SALES EDIT & RETURN LOGIC ---
         function editSale(id) {
@@ -1945,7 +1937,7 @@
             s.items.forEach(ci => { let invI = inventory.find(x => x.id == ci.id); if (invI) invI.stock += ci.qty; });
             
             // Reverse Customer Ledger
-            let c = customers.find(x => x.name === s.cust && x.phone === s.phone);
+            let c = customers.find(x => x.name === s.cust);
             if (c) { 
                 c.spent -= s.total; 
                 c.due -= (s.due || 0); 
@@ -1967,6 +1959,8 @@
 
             document.getElementById('posTax').value = s.taxPercent || '';
             document.getElementById('posLoyalty').value = s.loyaltyUsed || '';
+            document.getElementById('posShipping').value = s.shipping || '';
+            
             if(s.due === 0) document.getElementById('posAdvance').value = 'Full';
             else document.getElementById('posAdvance').value = s.total - s.due;
             
@@ -1992,7 +1986,7 @@
             s.items.forEach(ci => { let invI = inventory.find(x => x.id == ci.id); if (invI) invI.stock += ci.qty; });
             
             // Reverse Customer Ledger
-            let c = customers.find(x => x.name === s.cust && x.phone === s.phone);
+            let c = customers.find(x => x.name === s.cust);
             if (c) { 
                 c.spent -= s.total; 
                 c.due -= (s.due || 0); 
@@ -2030,6 +2024,9 @@
             tableHTML += `</table>`;
 
             let extras = "";
+            if (s.shipping > 0) {
+                extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize};">Shipping: ₹${s.shipping.toFixed(2)}</div>`;
+            }
             if (s.discount > 0) {
                 let discLabel = s.discountStr ? ` (${s.discountStr})` : '';
                 extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize};">${L.disc}${discLabel}: -₹${s.discount.toFixed(2)}</div>`;
@@ -2097,6 +2094,9 @@
         function viewPastBill(id) {
             const s = sales.find(x => x.id === id);
             let extras = "";
+            if (s.shipping > 0) {
+                extras += `<h4 align="right" style="margin:5px 0; color: #6c757d;">Shipping: ₹${s.shipping.toFixed(2)}</h4>`;
+            }
             if (s.discount > 0) {
                 let discLabel = s.discountStr ? ` (${s.discountStr})` : '';
                 extras += `<h4 align="right" style="margin:5px 0; color: #dc3545;">Discount${discLabel}: -₹${s.discount.toFixed(2)}</h4>`;
@@ -2110,7 +2110,6 @@
             if (s.loyaltyUsed > 0) extras += `<h4 align="right" style="margin:5px 0; color: #28a745;">Pts Used: -₹${s.loyaltyUsed}</h4>`;
             if (s.due > 0) extras += `<h4 align="right" style="margin:5px 0; color: red;">Due Balance: ₹${s.due}</h4>`;
             if (s.payMode) extras += `<h4 align="right" style="margin:5px 0; color: #17a2b8;">Pay Mode: ${s.payMode}</h4>`;
-            let photoHtml = (s.photo && s.photo !== "") ? `<img src="${s.photo}" style="width:100%; border-radius:8px; margin-top:15px; border:1px solid #eee;">` : '';
             
             let qrScreen = "";
             if(settings.upiId && s.due > 0) {
@@ -2121,7 +2120,7 @@
                 </div>`;
             }
 
-            document.getElementById('billDetailContent').innerHTML = `<h3>Bill #${s.id}</h3><hr><table style="width:100%">${s.items.map(i => `<tr><td>${i.name} <br><small>${i.brand||''}</small> x${i.qty} ${i.unit||'pcs'}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr>${extras}<h2 align="right">Total: ₹${s.total.toFixed(2)}</h2>${qrScreen}${photoHtml}<br><br>
+            document.getElementById('billDetailContent').innerHTML = `<h3>Bill #${s.id}</h3><hr><table style="width:100%">${s.items.map(i => `<tr><td>${i.name} <br><small>${i.brand||''}</small> x${i.qty} ${i.unit||'pcs'}</td><td align="right">₹${i.price*i.qty}</td></tr>`).join('')}</table><hr>${extras}<h2 align="right">Total: ₹${s.total.toFixed(2)}</h2>${qrScreen}<br><br>
                 <button class="btn btn-green" style="width:100%; margin-bottom:10px;" onclick="sendWhatsApp('${s.id}')">📱 Send WhatsApp Text</button>
                 <button class="btn btn-blue" style="width:100%; margin-bottom:10px;" onclick="printExistingBill('${s.id}')">🖨️ Re-Print</button>
                 <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Close</button>`;
@@ -2162,7 +2161,7 @@
             
             s.due -= amt;
             
-            let c = customers.find(x => x.name === s.cust && x.phone === s.phone);
+            let c = customers.find(x => x.name === s.cust);
             if (c) { 
                 c.due = (c.due || 0) - amt; 
                 if(c.due < 0) c.due = 0; 
@@ -2188,8 +2187,25 @@
             if (!c) return;
             if (amt <= 0 || amt > (c.due || 0)) return alert("Invalid amount.");
             
+            // Update customer ledger
             c.due -= amt;
             if(c.due < 0) c.due = 0;
+            
+            // NEW LOGIC: Distribute payment to specific unpaid bills in Sales History
+            let paymentRemaining = amt;
+            
+            for(let i = 0; i < sales.length; i++) {
+                if(paymentRemaining <= 0) break;
+                
+                let s = sales[i];
+                
+                // Explicitly check by customer name to ensure matching.
+                if(s.cust === c.name && s.due > 0 && !s.returned) {
+                    let toPay = Math.min(s.due, paymentRemaining);
+                    s.due -= toPay;
+                    paymentRemaining -= toPay;
+                }
+            }
             
             closeModals();
             refreshDisplays();
@@ -2295,6 +2311,7 @@
             let daySellDiscount = 0;
             let daySellReturn = 0;
             let dayCustReward = 0;
+            let daySellShipping = 0;
 
             daySalesItems.forEach(s => {
                 if (s.returned) {
@@ -2303,6 +2320,7 @@
                     daySalesAmount += (s.total || 0);
                     daySellDiscount += (s.discount || 0);
                     dayCustReward += (s.loyaltyUsed || 0);
+                    daySellShipping += (s.shipping || 0);
                 }
             });
 
@@ -2317,6 +2335,7 @@
             document.getElementById('pm-sell-disc').innerText = "₹ " + daySellDiscount.toFixed(2);
             document.getElementById('pm-cust-reward').innerText = "₹ " + dayCustReward.toFixed(2);
             document.getElementById('pm-sell-ret').innerText = "₹ " + daySellReturn.toFixed(2);
+            document.getElementById('pm-sell-shipping').innerText = "₹ " + daySellShipping.toFixed(2);
             
             document.getElementById('pm-tot-purch').innerText = "₹ 0.00"; 
             document.getElementById('pm-stk-adj').innerText = "₹ 0.00"; 
