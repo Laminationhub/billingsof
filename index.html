@@ -70,7 +70,7 @@
         .product-card:hover { border-color: var(--primary); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
         .modal-bg { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(4px); }
         .modal-box { background: white; padding: 35px; border-radius: 15px; width: 450px; max-height: 85vh; overflow-y: auto; }
-        .modal-box-large { width: 700px; max-width: 90vw; }
+        .modal-box-large { width: 750px; max-width: 95vw; }
         .form-group { margin-bottom: 18px; }
         .form-group label { display: block; font-size: 0.85em; font-weight: bold; color: #4a5568; margin-bottom: 8px; }
         .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; outline: none; }
@@ -164,7 +164,10 @@
         <div class="main-content">
             <div id="dashboard-view" class="view-section active">
                 <div class="header">
-                    <h1>Command Center</h1>
+                    <div>
+                        <h1 style="margin: 0;">Dashboard</h1>
+                        <div id="live-datetime" style="font-size: 0.9em; color: #64748b; margin-top: 5px; font-weight: bold; letter-spacing: 0.5px;"></div>
+                    </div>
                     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                         <button class="btn btn-blue" style="font-size: 1.1em; padding: 10px 20px;" onclick="switchTab('pos')">🛒 New Bill (POS)</button>
                         <button class="btn btn-warning" style="font-size: 1.1em; padding: 10px 20px;" onclick="openProfitModal()">📊 Daily Profit & Balances</button>
@@ -208,7 +211,7 @@
                             <select id="posCategoryFilter" style="padding:10px; border:1px solid #ccc; border-radius:8px;" onchange="refreshDisplays()">
                                 <option value="All">All Categories</option>
                             </select>
-                            <button class="btn btn-warning" onclick="openQwikBill()" style="font-weight:bold; font-size: 1.1em;">🖩 Quick Bill</button>
+                            <button class="btn btn-warning" onclick="openQuickBill()" style="font-weight:bold; font-size: 1.1em;">🖩 QUICK BILL</button>
                             <button class="btn btn-blue" onclick="openCameraScanner()">📷 Scan</button>
                         </div>
                         <div class="products-grid" id="posProductList"></div>
@@ -438,39 +441,122 @@
     </div>
 
     <div id="profitModal" class="modal-bg">
-        <div class="modal-box">
-            <h3 style="margin-top: 0;">📊 Daily Profit & Register</h3>
+        <div class="modal-box modal-box-large" style="background: #f4f5f7; padding: 30px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                <h2 style="margin: 0; color: #333;">Daily Profit & Balance</h2>
+                <span style="color:#999; cursor:pointer; font-size:1.5em; line-height:1;" onclick="closeModals()">✕</span>
+            </div>
             <p style="color:#666; font-size:0.9em; margin-bottom: 20px;">Date: <span id="pm-date"></span></p>
 
-            <div class="form-group">
+            <div class="form-group" style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px;">
                 <label>Opening Balance (Drawer Cash ₹)</label>
-                <input type="number" id="pm-opening" placeholder="Enter morning cash..." value="0" oninput="calculateClosingBalance()" style="font-size: 1.2em; text-align: left;">
+                <input type="number" id="pm-opening" placeholder="0" value="0" oninput="calculateClosingBalance()" style="font-size: 1.2em; text-align: left; width: 100%; max-width: 250px;">
             </div>
 
-            <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e2e8f0;">
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span>Gross Sales:</span> <strong style="color:var(--success);" id="pm-sales">₹0</strong>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; background: white; padding: 25px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px;">
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Opening Stock<br><span style="font-weight: normal; font-size: 0.9em;">(By sale price):</span></span>
+                        <span id="pm-open-stock" style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total purchase:<br><span style="font-weight: normal; font-size: 0.9em;">(Exc. tax, Discount)</span></span>
+                        <span id="pm-tot-purch" style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total Stock Adjustment:</span>
+                        <span id="pm-stk-adj" style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total Expense:</span>
+                        <span id="pm-tot-exp" style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total purchase shipping charge:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Purchase additional expenses:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total transfer shipping charge:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total Sell discount:</span>
+                        <span id="pm-sell-disc" style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total customer reward:</span>
+                        <span id="pm-cust-reward" style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total Sell Return:</span>
+                        <span id="pm-sell-ret" style="color:#333;">₹ 0.00</span>
+                    </div>
                 </div>
-                <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <span>Total Expenses:</span> <strong style="color:var(--danger);" id="pm-expenses">₹0</strong>
-                </div>
-                <hr style="border-top:1px dashed #ccc; margin:10px 0;">
-                <div style="display:flex; justify-content:space-between; font-size: 1.2em;">
-                    <span>Net Profit:</span> <strong id="pm-net">₹0</strong>
+
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Closing stock<br><span style="font-weight: normal; font-size: 0.9em;">(By sale price):</span></span>
+                        <span id="pm-close-stock" style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total Sales:<br><span style="font-weight: normal; font-size: 0.9em;">(Exc. tax, Discount)</span></span>
+                        <span id="pm-tot-sales" style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total sell shipping charge:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Sell additional expenses:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total Stock Recovered:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total Purchase Return:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total Purchase discount:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size: 0.85em;">
+                        <span style="color:#666; font-weight: 600;">Total sell round off:</span>
+                        <span style="color:#333;">₹ 0.00</span>
+                    </div>
                 </div>
             </div>
 
-            <div style="background: var(--dark); color: white; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <div style="display:flex; justify-content:space-between; font-size: 1.2em;">
-                    <span>Expected Closing Balance:</span> <strong id="pm-closing">₹0</strong>
+            <div style="background: white; padding: 25px; border-radius: 8px; border: 1px solid #ddd;">
+                <div style="display:flex; flex-direction:column; gap: 15px;">
+                    <div style="display:flex; align-items: baseline; gap: 10px;">
+                        <span style="font-size: 1.3em; color: #666; font-weight: 600;">Gross Profit:</span> 
+                        <span id="pm-gross-profit" style="font-size: 1.3em; color: #555;">₹ 0.00</span>
+                    </div>
+                    <div style="font-size: 0.8em; color: #999; margin-top: -10px; margin-bottom: 5px;">(Total sell price - Total purchase price)</div>
+                    
+                    <div style="display:flex; align-items: baseline; gap: 10px;">
+                        <span style="font-size: 1.5em; color: #333; font-weight: bold;">Net Profit:</span> 
+                        <span id="pm-net-profit" style="font-size: 1.5em; color: #333;">₹ 0.00</span>
+                    </div>
+                </div>
+                
+                <hr style="margin: 20px 0; border: none; border-top: 1px dashed #ccc;">
+                <div style="display:flex; justify-content:space-between; align-items: center;">
+                    <span style="font-size: 1.1em; color: #666; font-weight: bold;">Expected Drawer Cash:</span> 
+                    <strong id="pm-closing-drawer" style="font-size: 1.4em; color: var(--primary);">₹ 0.00</strong>
                 </div>
             </div>
-
-            <button class="btn btn-gray" style="width:100%" onclick="closeModals()">Close Window</button>
         </div>
     </div>
 
-    <div id="qwikBillModal" class="modal-bg">
+    <div id="quickBillModal" class="modal-bg">
         <div class="modal-box" style="width: 380px; max-width: 95vw; background: #f4f7f9; padding: 25px; border-radius: 16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
                 <h3 style="margin:0; color: #1e293b; font-size: 1.3em;">Fast Entry</h3>
@@ -516,7 +602,7 @@
                 <button class="qb-btn op-grn" onclick="qbInput('+')">+</button>
             </div>
             
-            <button id="qb-add-btn" class="btn" style="width: 100%; margin-top: 20px; padding: 18px; font-size: 1.1em; font-weight:700; background: #007bff; color: white; border-radius: 10px; letter-spacing: 0.5px;" onclick="addQwikBillToCart()">ADD TO CART ➔</button>
+            <button id="qb-add-btn" class="btn" style="width: 100%; margin-top: 20px; padding: 18px; font-size: 1.1em; font-weight:700; background: #007bff; color: white; border-radius: 10px; letter-spacing: 0.5px;" onclick="addQuickBillToCart()">ADD TO CART ➔</button>
         </div>
     </div>
 
@@ -750,6 +836,18 @@
         let editingSaleId = null; let editingSaleDate = null;
         let currentOrderPhotoBase64 = ""; let html5QrcodeScanner = null; let salesChartInstance = null; let pieChartInstance = null;
 
+        // LIVE DATE AND TIME CLOCK
+        function updateClock() {
+            const dt = document.getElementById('live-datetime');
+            if(dt) {
+                const now = new Date();
+                const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+                dt.innerText = now.toLocaleDateString('en-IN', options);
+            }
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
         // CSV IMPORT LOGIC
         function openCSVModal() {
             document.getElementById('csvModal').style.display = 'flex';
@@ -879,13 +977,13 @@
         function calcClear() { document.getElementById('calc-display').value = ''; }
         function calcEval() { try { document.getElementById('calc-display').value = eval(document.getElementById('calc-display').value); } catch(e) { document.getElementById('calc-display').value = 'Error'; } }
 
-        // NEW Quick Bill LOGIC
+        // NEW QUICK BILL LOGIC
         let qbExpression = "";
 
-        function openQwikBill() {
+        function openQuickBill() {
             qbExpression = "";
-            updateQwikBillDisplay();
-            document.getElementById('qwikBillModal').style.display = 'flex';
+            updateQuickBillDisplay();
+            document.getElementById('quickBillModal').style.display = 'flex';
         }
 
         function qbInput(char) {
@@ -898,20 +996,20 @@
             } else {
                 qbExpression += char;
             }
-            updateQwikBillDisplay();
+            updateQuickBillDisplay();
         }
 
         function qbBackspace() {
             qbExpression = qbExpression.slice(0, -1);
-            updateQwikBillDisplay();
+            updateQuickBillDisplay();
         }
 
         function qbClear() {
             qbExpression = "";
-            updateQwikBillDisplay();
+            updateQuickBillDisplay();
         }
 
-        function updateQwikBillDisplay() {
+        function updateQuickBillDisplay() {
             let displayStr = qbExpression.replace(/\*/g, ' × ').replace(/\//g, ' ÷ ').replace(/\+/g, ' + ').replace(/\-/g, ' - ');
             document.getElementById('qb-expr').innerText = displayStr;
             
@@ -934,7 +1032,7 @@
             document.getElementById('qb-add-btn').innerHTML = `ADD TO CART (₹ ${total}) ➔`;
         }
 
-        function addQwikBillToCart() {
+        function addQuickBillToCart() {
             if (!qbExpression) return;
             let evalExpr = qbExpression;
             const operators = ['+', '-', '*', '/'];
@@ -945,7 +1043,7 @@
             try {
                 // Split by '+' to separate multiple distinct items
                 let parts = evalExpr.split('+');
-                let offset = cart.filter(c => c.name.startsWith("Qwik Item")).length;
+                let offset = cart.filter(c => c.name.startsWith("Quick Item")).length;
                 
                 parts.forEach((part, index) => {
                     let rate = 0;
@@ -970,8 +1068,8 @@
                     if (rate && rate > 0 && qty && qty > 0) {
                         rate = Math.round(rate * 100) / 100;
                         qty = Math.round(qty * 100) / 100; // Allow decimal quantities too!
-                        let desc = `Qwik Item ${offset + index + 1}`;
-                        cart.push({id: 'qwik_'+Date.now()+'_'+index, name: desc, price: rate, qty: qty, unit: 'pcs', brand: ''});
+                        let desc = `Quick Item ${offset + index + 1}`;
+                        cart.push({id: 'quick_'+Date.now()+'_'+index, name: desc, price: rate, qty: qty, unit: 'pcs', brand: ''});
                     }
                 });
                 updateCart();
@@ -2138,13 +2236,49 @@
 
         // --- PROFIT MODAL LOGIC ---
         function openProfitModal() {
-            document.getElementById('pm-date').innerText = new Date().toLocaleDateString();
-            document.getElementById('pm-sales').innerText = "₹" + (window.currentDaySales || 0).toFixed(2);
-            document.getElementById('pm-expenses').innerText = "₹" + (window.currentDayExp || 0).toFixed(2);
-            let net = (window.currentDaySales || 0) - (window.currentDayExp || 0);
-            let netEl = document.getElementById('pm-net');
-            netEl.innerText = "₹" + net.toFixed(2);
-            netEl.style.color = net >= 0 ? "var(--success)" : "var(--danger)";
+            let today = new Date().toLocaleDateString();
+            document.getElementById('pm-date').innerText = today;
+
+            let daySalesItems = sales.filter(s => s.date && s.date.split(',')[0] === today);
+            
+            let daySalesAmount = 0;
+            let daySellDiscount = 0;
+            let daySellReturn = 0;
+            let dayCustReward = 0;
+
+            daySalesItems.forEach(s => {
+                if (s.returned) {
+                    daySellReturn += (s.total || 0);
+                } else {
+                    daySalesAmount += (s.total || 0);
+                    daySellDiscount += (s.discount || 0);
+                    dayCustReward += (s.loyaltyUsed || 0);
+                }
+            });
+
+            let dayExp = expenses.filter(e => e.date === today).reduce((a, b) => a + (b.amt || 0), 0);
+            let stockVal = inventory.reduce((a,b) => a + (b.price * b.stock), 0);
+
+            // Bind values
+            document.getElementById('pm-open-stock').innerText = "₹ " + stockVal.toFixed(2);
+            document.getElementById('pm-close-stock').innerText = "₹ " + stockVal.toFixed(2);
+            document.getElementById('pm-tot-sales').innerText = "₹ " + daySalesAmount.toFixed(2);
+            document.getElementById('pm-tot-exp').innerText = "₹ " + dayExp.toFixed(2);
+            document.getElementById('pm-sell-disc').innerText = "₹ " + daySellDiscount.toFixed(2);
+            document.getElementById('pm-cust-reward').innerText = "₹ " + dayCustReward.toFixed(2);
+            document.getElementById('pm-sell-ret').innerText = "₹ " + daySellReturn.toFixed(2);
+            
+            document.getElementById('pm-tot-purch').innerText = "₹ 0.00"; 
+            document.getElementById('pm-stk-adj').innerText = "₹ 0.00"; 
+
+            let grossProfit = daySalesAmount; 
+            let netProfit = daySalesAmount - dayExp;
+
+            document.getElementById('pm-gross-profit').innerText = "₹ " + grossProfit.toFixed(2);
+            document.getElementById('pm-net-profit').innerText = "₹ " + netProfit.toFixed(2);
+
+            window.currentDaySales = daySalesAmount; 
+            window.currentDayExp = dayExp;
 
             let todayStr = new Date().toLocaleDateString();
             let savedOpening = localStorage.getItem('lh_opening_' + todayStr) || 0;
@@ -2159,9 +2293,9 @@
             let todayStr = new Date().toLocaleDateString();
             localStorage.setItem('lh_opening_' + todayStr, opening);
 
-            let net = (window.currentDaySales || 0) - (window.currentDayExp || 0);
-            let closing = opening + net;
-            document.getElementById('pm-closing').innerText = "₹" + closing.toFixed(2);
+            let netCash = (window.currentDaySales || 0) - (window.currentDayExp || 0); 
+            let closing = opening + netCash;
+            document.getElementById('pm-closing-drawer').innerText = "₹ " + closing.toFixed(2);
         }
     </script>
 </body>
