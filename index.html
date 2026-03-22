@@ -6,7 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Lamination Hub - Pro Suite</title>
+    <title>Billing Hub - Powered By Lamination Hub</title>
     
     <link rel="manifest" id="manifest-placeholder">
     
@@ -116,9 +116,10 @@
 
     <div id="login-screen">
         <div class="login-box">
-            <h1 style="color:var(--primary); margin-bottom:0;">LH</h1>
-            <h2>Lamination Hub</h2>
-            <p style="color:#666; margin-bottom: 20px;" id="login-status">Sign in or use Local Mode</p>
+            <h1 style="color:var(--primary); margin-bottom:0; font-size: 3.5em;">BH</h1>
+            <h2 style="margin-bottom: 5px;">Billing Hub</h2>
+            <p style="color:#888; font-size:0.85em; margin-top:0;">Powered By Lamination Hub</p>
+            <p style="color:#666; margin-bottom: 20px; margin-top: 15px;" id="login-status">Sign in or use Local Mode</p>
             
             <button class="btn-google" id="googleLoginBtn" onclick="handleGoogleLogin()">
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
@@ -138,7 +139,8 @@
                 <div class="profile-pic-container">
                     <img id="sidebar-img" src="https://via.placeholder.com/80" alt="Profile">
                 </div>
-                <h2 id="brand-name">Lamination Hub</h2>
+                <h2 id="brand-name" style="margin-bottom: 2px;">Billing Hub</h2>
+                <div style="font-size: 0.7em; color: #ccc; margin-bottom: 5px;">Powered By Lamination Hub</div>
                 <p id="brand-city" style="font-size: 0.8em; opacity: 0.7; margin-top: 5px;">Kurebhar Branch</p>
                 <button class="btn btn-danger" style="width:100%; margin-top:15px; padding:8px; font-size:0.8em;" onclick="lockScreen()">🔒 Lock System</button>
             </div>
@@ -768,7 +770,7 @@
         <div class="modal-box" style="width: 500px;">
             <h3>📢 WhatsApp Promo Broadcast</h3>
             <p style="font-size: 0.8em; color: #666;">Type your offer below and click generate to send to your customer list.</p>
-            <textarea id="broadcastMsg" rows="4" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; outline: none; margin-bottom: 10px;" placeholder="Ex: Flat 20% off on all Laptop Skins this weekend at Lamination Hub!"></textarea>
+            <textarea id="broadcastMsg" rows="4" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ccc; outline: none; margin-bottom: 10px;" placeholder="Ex: Flat 20% off on all Laptop Skins this weekend at Billing Hub!"></textarea>
             <button class="btn btn-blue" style="width:100%" onclick="generateBroadcastLinks()">Generate Send Links</button>
             <div id="broadcastLinksContainer" style="max-height: 250px; overflow-y: auto; margin-top: 15px;"></div>
             <button class="btn btn-gray" style="width:100%; margin-top:15px;" onclick="closeModals()">Close</button>
@@ -808,7 +810,7 @@
 
     <script>
         // PWA INLINE MANIFEST
-        const manifest = { "name": "Lamination Hub Pro", "short_name": "LH Pro", "start_url": ".", "display": "standalone", "background_color": "#2c3e50", "theme_color": "#007bff", "icons": [{"src": "https://via.placeholder.com/192/007bff/ffffff?text=LH", "sizes": "192x192", "type": "image/png"}] };
+        const manifest = { "name": "Billing Hub", "short_name": "Billing Hub", "start_url": ".", "display": "standalone", "background_color": "#2c3e50", "theme_color": "#007bff", "icons": [{"src": "https://via.placeholder.com/192/007bff/ffffff?text=BH", "sizes": "192x192", "type": "image/png"}] };
         const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
         document.getElementById('manifest-placeholder').href = URL.createObjectURL(manifestBlob);
 
@@ -829,7 +831,7 @@
 
         // DATA STATE
         let appPass = '1234';
-        let settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '', printMethod: 'browser' };
+        let settings = { name: 'Billing Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '', printMethod: 'browser' };
         let inventory = []; let sales = []; let expenses = []; let customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
         let suppliers = []; let quotations = []; let categories = ["General"]; 
         let cart = []; let custTrigger = "list"; let tempBase64Img = ""; let editingProductId = null;
@@ -860,7 +862,7 @@
             const blob = new Blob([headers + sample], { type: 'text/csv' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = 'LaminationHub_Inventory_Template.csv';
+            a.download = 'BillingHub_Inventory_Template.csv';
             a.click();
         }
 
@@ -1098,7 +1100,7 @@
 
         // SMART DATA LOADER
         function loadLocalData() {
-            appPass = '1234'; settings = { name: 'Lamination Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '', printMethod: 'browser' };
+            appPass = '1234'; settings = { name: 'Billing Hub', city: 'Kurebhar', address: '', gst: '', phone: '', email: '', profilePic: '', staffPin: '', printerSize: 'A4', receiptLanguage: 'EN', taxRate: 0, taxMode: 'EXCLUSIVE', customTaxRates: [], upiId: '', printMethod: 'browser' };
             inventory = []; sales = []; expenses = []; customers = [{id:1, name:'Walk-in', phone:'--', spent:0, due:0, points:0}];
             suppliers = []; quotations = []; categories = ["General"];
             
@@ -1147,7 +1149,7 @@
                     let c_cat = c.categories || ["General"];
                     c_cat.forEach(cat => { if(!categories.includes(cat)) categories.push(cat); });
 
-                    if(c.settings && (!settings.name || settings.name === 'Lamination Hub')) {
+                    if(c.settings && (!settings.name || settings.name === 'Lamination Hub' || settings.name === 'Billing Hub')) {
                         settings = c.settings;
                     }
                 }
