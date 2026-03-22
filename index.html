@@ -208,7 +208,7 @@
                             <select id="posCategoryFilter" style="padding:10px; border:1px solid #ccc; border-radius:8px;" onchange="refreshDisplays()">
                                 <option value="All">All Categories</option>
                             </select>
-                            <button class="btn btn-warning" onclick="openQwikBill()" style="font-weight:bold; font-size: 1.1em;">🖩 QWIK BILL</button>
+                            <button class="btn btn-warning" onclick="openQwikBill()" style="font-weight:bold; font-size: 1.1em;">🖩 Quick Bill</button>
                             <button class="btn btn-blue" onclick="openCameraScanner()">📷 Scan</button>
                         </div>
                         <div class="products-grid" id="posProductList"></div>
@@ -879,7 +879,7 @@
         function calcClear() { document.getElementById('calc-display').value = ''; }
         function calcEval() { try { document.getElementById('calc-display').value = eval(document.getElementById('calc-display').value); } catch(e) { document.getElementById('calc-display').value = 'Error'; } }
 
-        // NEW QWIK BILL LOGIC
+        // NEW Quick Bill LOGIC
         let qbExpression = "";
 
         function openQwikBill() {
