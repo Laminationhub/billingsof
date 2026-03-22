@@ -243,8 +243,14 @@
                         </div>
 
                         <div class="checkout-row">
-                            <span style="font-weight: bold; color: #64748b; font-size: 0.9em;">DISCOUNT (₹)</span>
-                            <input type="number" id="posDiscount" placeholder="0" style="width: 100px; padding: 8px; text-align: right; border: 1px solid #cbd5e1; border-radius: 5px;" oninput="updateCart()" min="0">
+                            <span style="font-weight: bold; color: #64748b; font-size: 0.9em;">DISCOUNT</span>
+                            <div style="display:flex; gap:5px;">
+                                <input type="number" id="posDiscount" placeholder="0" style="width: 60px; padding: 8px; text-align: right; border: 1px solid #cbd5e1; border-radius: 5px; outline:none;" oninput="updateCart()" min="0">
+                                <select id="posDiscountType" style="padding: 8px; border: 1px solid #cbd5e1; border-radius: 5px; outline:none; background:white;" onchange="updateCart()">
+                                    <option value="flat">₹</option>
+                                    <option value="percent">%</option>
+                                </select>
+                            </div>
                         </div>
                         
                         <div class="checkout-row">
@@ -581,6 +587,11 @@
             </style>
 
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                <button class="qb-btn op-red" onclick="qbClear()" style="font-size:1.2em;">AC</button>
+                <button class="qb-btn op-blue" onclick="qbInput('(')">(</button>
+                <button class="qb-btn op-blue" onclick="qbInput(')')">)</button>
+                <button class="qb-btn op-blue" onclick="qbInput('%')">%</button>
+
                 <button class="qb-btn num" onclick="qbInput('7')">7</button>
                 <button class="qb-btn num" onclick="qbInput('8')">8</button>
                 <button class="qb-btn num" onclick="qbInput('9')">9</button>
@@ -1023,7 +1034,11 @@
                     if (operators.includes(evalExpr.slice(-1))) {
                         evalExpr = evalExpr.slice(0, -1);
                     }
-                    total = eval(evalExpr) || 0;
+                    
+                    // Handle A + B% or A - B%
+                    let safeExpr = evalExpr.replace(/(\d+(?:\.\d+)?)\s*([\+\-])\s*(\d+(?:\.\d+)?)%/g, "($1 $2 ($1 * $3 / 100))");
+                    safeExpr = safeExpr.replace(/%/g, '/100');
+                    total = eval(safeExpr) || 0;
                 }
             } catch(e) {
                 total = 0;
@@ -1043,27 +1058,27 @@
             }
 
             try {
-                // Split by '+' to separate multiple distinct items
                 let parts = evalExpr.split('+');
                 let offset = cart.filter(c => c.name.startsWith("Quick Item")).length;
                 
                 parts.forEach((part, index) => {
+                    let safePart = part.replace(/(\d+(?:\.\d+)?)\s*([\+\-])\s*(\d+(?:\.\d+)?)%/g, "($1 $2 ($1 * $3 / 100))");
+                    safePart = safePart.replace(/%/g, '/100');
+
                     let rate = 0;
                     let qty = 1;
                     
-                    // If there's a multiplication, parse it as Rate * Quantity
-                    if (part.includes('*')) {
-                        let subParts = part.split('*');
-                        if (subParts.length === 2) {
+                    if (safePart.includes('*')) {
+                        let subParts = safePart.split('*');
+                        if (subParts.length === 2 && !safePart.includes('(')) {
                             rate = eval(subParts[0]);
                             qty = eval(subParts[1]);
                         } else {
-                            rate = eval(part);
+                            rate = eval(safePart);
                             qty = 1;
                         }
                     } else {
-                        // Standard flat amount
-                        rate = eval(part);
+                        rate = eval(safePart);
                         qty = 1;
                     }
 
@@ -1745,7 +1760,11 @@
                 </tr>`; 
             }).join('');
             
-            let discount = parseFloat(document.getElementById('posDiscount').value) || 0; let loyaltyUsed = parseFloat(document.getElementById('posLoyalty').value) || 0;
+            let discountInput = parseFloat(document.getElementById('posDiscount').value) || 0; 
+            let discountType = document.getElementById('posDiscountType').value;
+            let discount = discountType === 'percent' ? (subtotal * (discountInput / 100)) : discountInput;
+
+            let loyaltyUsed = parseFloat(document.getElementById('posLoyalty').value) || 0;
             if (c && loyaltyUsed > (c.points || 0)) { loyaltyUsed = c.points || 0; document.getElementById('posLoyalty').value = loyaltyUsed; } 
 
             let taxableAmount = subtotal - discount; if(taxableAmount < 0) taxableAmount = 0;
@@ -1779,7 +1798,11 @@
             
             let text = `🧾 *${settings.name}*\n${L.inv}: #${item.id}\n${L.date}: ${item.date}\n${L.cust}: ${item.cust}\n------------------------\n`;
             item.items.forEach(i => { text += `${i.name} (x${i.qty} ${i.unit||'pcs'}) - ₹${i.price * i.qty}\n`; }); text += `------------------------\n`;
-            if (item.discount > 0) text += `${L.disc}: -₹${item.discount}\n`;
+            
+            if (item.discount > 0) {
+                let discLabel = item.discountStr ? ` (${item.discountStr})` : '';
+                text += `${L.disc}${discLabel}: -₹${item.discount.toFixed(2)}\n`;
+            }
             if (item.tax > 0) {
                 let halfTax = (item.tax / 2).toFixed(2);
                 let taxModeStr = item.taxMode === 'INCLUSIVE' ? '(Incl.)' : '(Added)';
@@ -1816,9 +1839,15 @@
         function completeSale(actionType = 'print') {
             if (cart.length === 0) return; 
             let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', '')); let due = parseFloat(document.getElementById('dueTotal').innerText.replace('₹', '')) || 0;
-            let discount = parseFloat(document.getElementById('posDiscount').value) || 0; let loyaltyUsed = parseFloat(document.getElementById('posLoyalty').value) || 0;
+            let loyaltyUsed = parseFloat(document.getElementById('posLoyalty').value) || 0;
             
-            let taxableAmount = cart.reduce((a,b)=>a+(b.price*b.qty),0) - discount;
+            let subtotal = cart.reduce((a,b)=>a+(b.price*b.qty),0);
+            let discountInput = parseFloat(document.getElementById('posDiscount').value) || 0;
+            let discountType = document.getElementById('posDiscountType').value;
+            let discountAmount = discountType === 'percent' ? (subtotal * (discountInput / 100)) : discountInput;
+            let discountStr = discountType === 'percent' ? `${discountInput}%` : `₹${discountInput}`;
+            
+            let taxableAmount = subtotal - discountAmount;
             let taxPercentInput = document.getElementById('posTax').value;
             let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : (settings.taxRate || 0);
             let taxMode = settings.taxMode || 'EXCLUSIVE';
@@ -1838,7 +1867,7 @@
             let saleId = editingSaleId ? editingSaleId : Date.now().toString().slice(-6);
             let saleDate = editingSaleDate ? editingSaleDate : new Date().toLocaleString();
 
-            const newSale = { id: saleId, date: saleDate, cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxPercent: taxPercent, taxMode: taxMode, due: due, discount: discount, loyaltyUsed: loyaltyUsed, earnedPoints: earnedPoints, photo: currentOrderPhotoBase64, payMode: payMode, items: JSON.parse(JSON.stringify(cart)), returned: false };
+            const newSale = { id: saleId, date: saleDate, cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxPercent: taxPercent, taxMode: taxMode, due: due, discount: discountAmount, discountStr: discountStr, loyaltyUsed: loyaltyUsed, earnedPoints: earnedPoints, photo: currentOrderPhotoBase64, payMode: payMode, items: JSON.parse(JSON.stringify(cart)), returned: false };
             sales.push(newSale); 
             
             if(c) { c.spent += total; c.due = (c.due || 0) + due; c.points = (c.points || 0) - loyaltyUsed + earnedPoints; }
@@ -1867,9 +1896,14 @@
         function saveQuotation() {
             if (cart.length === 0) return;
             let total = parseFloat(document.getElementById('grandTotal').innerText.replace('₹', ''));
-            let discount = parseFloat(document.getElementById('posDiscount').value) || 0;
             
-            let taxableAmount = cart.reduce((a,b)=>a+(b.price*b.qty),0) - discount;
+            let subtotal = cart.reduce((a,b)=>a+(b.price*b.qty),0);
+            let discountInput = parseFloat(document.getElementById('posDiscount').value) || 0;
+            let discountType = document.getElementById('posDiscountType').value;
+            let discountAmount = discountType === 'percent' ? (subtotal * (discountInput / 100)) : discountInput;
+            let discountStr = discountType === 'percent' ? `${discountInput}%` : `₹${discountInput}`;
+            
+            let taxableAmount = subtotal - discountAmount;
             let taxPercentInput = document.getElementById('posTax').value;
             let taxPercent = taxPercentInput !== "" ? (parseFloat(taxPercentInput) || 0) : (settings.taxRate || 0);
             let taxMode = settings.taxMode || 'EXCLUSIVE';
@@ -1884,7 +1918,7 @@
 
             let cid = document.getElementById('posCustomerSelect').value; let c = customers.find(x => x.id == cid);
 
-            const newQuote = { id: 'Q' + Date.now().toString().slice(-5), date: new Date().toLocaleString(), cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxMode: taxMode, discount: discount, items: JSON.parse(JSON.stringify(cart)) };
+            const newQuote = { id: 'Q' + Date.now().toString().slice(-5), date: new Date().toLocaleString(), cust: c.name, phone: c.phone, total: total, tax: taxAmount, taxMode: taxMode, discount: discountAmount, discountStr: discountStr, items: JSON.parse(JSON.stringify(cart)) };
             quotations.push(newQuote);
             
             generateReceiptHTML(newQuote, true); 
@@ -1897,7 +1931,7 @@
             }, 100); 
         }
 
-        function resetCart() { cart = []; document.getElementById('posDiscount').value = ''; document.getElementById('posTax').value = ''; document.getElementById('posLoyalty').value = ''; document.getElementById('posAdvance').value = ''; document.getElementById('posOrderPhoto').value = ''; document.getElementById('posPayMode').value = 'Cash'; currentOrderPhotoBase64 = ""; updateCart(); }
+        function resetCart() { cart = []; document.getElementById('posDiscount').value = ''; document.getElementById('posDiscountType').value = 'flat'; document.getElementById('posTax').value = ''; document.getElementById('posLoyalty').value = ''; document.getElementById('posAdvance').value = ''; document.getElementById('posOrderPhoto').value = ''; document.getElementById('posPayMode').value = 'Cash'; currentOrderPhotoBase64 = ""; updateCart(); }
 
         // --- SALES EDIT & RETURN LOGIC ---
         function editSale(id) {
@@ -1922,7 +1956,15 @@
 
             // Load to POS
             cart = JSON.parse(JSON.stringify(s.items));
-            document.getElementById('posDiscount').value = s.discount || '';
+            
+            if (s.discountStr && s.discountStr.includes('%')) {
+                document.getElementById('posDiscount').value = parseFloat(s.discountStr) || '';
+                document.getElementById('posDiscountType').value = 'percent';
+            } else {
+                document.getElementById('posDiscount').value = s.discount || '';
+                document.getElementById('posDiscountType').value = 'flat';
+            }
+
             document.getElementById('posTax').value = s.taxPercent || '';
             document.getElementById('posLoyalty').value = s.loyaltyUsed || '';
             if(s.due === 0) document.getElementById('posAdvance').value = 'Full';
@@ -1988,7 +2030,10 @@
             tableHTML += `</table>`;
 
             let extras = "";
-            if (s.discount > 0) extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize};">${L.disc}: -₹${s.discount}</div>`;
+            if (s.discount > 0) {
+                let discLabel = s.discountStr ? ` (${s.discountStr})` : '';
+                extras += `<div style="text-align:right; margin:4px 0; font-size:${fSize};">${L.disc}${discLabel}: -₹${s.discount.toFixed(2)}</div>`;
+            }
             if (s.tax > 0) {
                 let halfTax = (s.tax / 2).toFixed(2);
                 let taxModeStr = s.taxMode === 'INCLUSIVE' ? '(Incl.)' : '(Added)';
@@ -2052,7 +2097,10 @@
         function viewPastBill(id) {
             const s = sales.find(x => x.id === id);
             let extras = "";
-            if (s.discount > 0) extras += `<h4 align="right" style="margin:5px 0; color: #dc3545;">Discount: -₹${s.discount}</h4>`;
+            if (s.discount > 0) {
+                let discLabel = s.discountStr ? ` (${s.discountStr})` : '';
+                extras += `<h4 align="right" style="margin:5px 0; color: #dc3545;">Discount${discLabel}: -₹${s.discount.toFixed(2)}</h4>`;
+            }
             if (s.tax > 0) {
                 let halfTax = (s.tax / 2).toFixed(2);
                 let taxModeStr = s.taxMode === 'INCLUSIVE' ? '(Incl.)' : '(Added)';
