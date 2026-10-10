@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111111"><title>Lamination Hub Admin</title><link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap admin-wrap">
+  <header class="admin-head"><div><p class="eyebrow">LAMINATION HUB</p><h1>Website Admin</h1><p class="muted">Changes are saved online and appear on the public page.</p></div><a class="btn" href="./">View public page ↗</a></header>
+  <section class="panel" id="loginPanel"><h2>Admin login</h2><form id="loginForm" class="form"><label>Email<input id="email" type="email" required autocomplete="username"></label><label>Password<input id="password" type="password" required autocomplete="current-password"></label><button class="btn orange" type="submit">Sign in</button><p class="small muted">Create your admin user in Supabase Authentication first. Public sign-up is intentionally not provided.</p></form></section>
+  <div id="dashboard" hidden>
+    <div class="admin-toolbar"><h2>Business profile</h2><button id="logout" class="btn">Sign out</button></div>
+    <form id="profileForm" class="panel form">
+      <label>Business name<input id="f_name" required></label>
+      <label>Short logo text (e.g. LH)<input id="f_logo" maxlength="5"></label>
+      <label>Upload business logo <span class="hint">PNG, JPG, WEBP or SVG · max 3 MB</span><input id="logoFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml"></label>
+      <label>Or paste Google Drive logo link <span class="hint">Share the file as “Anyone with the link” · Viewer</span><input id="logoDriveUrl" type="url" placeholder="https://drive.google.com/file/d/FILE_ID/view"></label>
+      <p class="hint">If you use a Drive link, leave the file upload empty. For best reliability, use a direct public image link.</p>
+      <div class="upload-preview"><img id="logoPreview" alt="Logo preview" hidden><span id="logoUploadStatus" class="hint">Choose a file, then save the profile to publish it.</span></div>
+      <label>Tagline<input id="f_tagline"></label>
+      <label>About your business<textarea id="f_about" rows="3"></textarea></label>
+      <label>Phone number, with country code<input id="f_phone" placeholder="919876543210"></label>
+      <label>WhatsApp number, with country code<input id="f_whatsapp" placeholder="919876543210"></label>
+      <label>Instagram URL<input id="f_instagram" type="url" placeholder="https://instagram.com/yourname"></label>
+      <label>Facebook URL<input id="f_facebook" type="url" placeholder="https://facebook.com/yourpage"></label>
+      <label>YouTube URL<input id="f_youtube" type="url" placeholder="https://youtube.com/@yourchannel"></label>
+      <label>Website URL<input id="f_website" type="url" placeholder="https://example.com"></label>
+      <label>Address<input id="f_address"></label>
+      <label>Google Maps URL<input id="f_maps" type="url"></label>
+      <label>Opening hours<input id="f_hours"></label>
+      <button class="btn orange" type="submit">Save profile online</button>
+    </form>
+    <section class="panel"><div class="admin-toolbar"><h2>Services & products</h2><button id="addService" class="btn orange" type="button">+ Add service</button></div><div id="serviceEditor" class="editor-list"></div></section>
+    <p class="small muted">Security note: never put your Supabase service-role key in this website. Only the public anon/publishable key belongs in config.js; database access is protected by Row Level Security.</p>
+  </div>
+</main>
+<div id="status" class="status" role="status"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="admin.js"></script>
+</body></html>
